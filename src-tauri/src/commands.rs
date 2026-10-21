@@ -168,6 +168,30 @@ pub async fn sftp_list(
     settle(&connections, &session, &connection, result).await
 }
 
+/// Permanently deletes `name` in `remote_dir` on `alias`, a folder with
+/// everything in it. The frontend confirms first.
+#[tauri::command]
+pub async fn sftp_delete(
+    broker: State<'_, Arc<Broker>>,
+    connections: State<'_, Connections>,
+    session: String,
+    alias: String,
+    remote_dir: String,
+    name: String,
+    config_path: Option<PathBuf>,
+) -> Result<(), sftp::Error> {
+    let connection = sftp_connection(
+        &broker,
+        &connections,
+        &session,
+        &alias,
+        config_path.as_deref(),
+    )
+    .await?;
+    let result = connection.delete(&remote_dir, &name).await;
+    settle(&connections, &session, &connection, result).await
+}
+
 /// Drops the connection after a failure that left it unusable, so the next
 /// request reconnects.
 async fn settle<T>(

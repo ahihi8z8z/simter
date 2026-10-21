@@ -173,6 +173,70 @@ impl Connection {
             unparsed: Vec::new(),
         })
     }
+
+    /// Permanently deletes `name` in `remote_dir`; a folder is deleted with
+    /// everything in it. Links are deleted, never followed.
+    pub async fn delete(&self, remote_dir: &str, name: &str) -> Result<(), Failure> {
+        if name.is_empty() || name.contains('/') || name == "." || name == ".." {
+            return Err(Failure {
+                error: Error::new(
+                    ErrorKind::Other,
+                    format!("cannot delete {name:?}: not a file name"),
+                ),
+                lost: false,
+            });
+        }
+        let path = join(remote_dir, name);
+        let attrs = self
+            .sftp
+            .symlink_metadata(path.as_str())
+            .await
+            .map_err(|e| failure(&path, e))?;
+        if kind_of(&attrs) != Kind::Dir {
+            return self.remove_file(&path).await;
+        }
+        // Files go as they are found; folders afterwards, deepest first.
+        let mut pending = vec![path];
+        let mut dirs = Vec::new();
+        while let Some(dir) = pending.pop() {
+            let entries = self
+                .sftp
+                .read_dir(dir.as_str())
+                .await
+                .map_err(|e| failure(&dir, e))?;
+            for entry in entries {
+                let child = join(&dir, &entry.file_name());
+                if kind_of(&entry.metadata()) == Kind::Dir {
+                    pending.push(child);
+                } else {
+                    self.remove_file(&child).await?;
+                }
+            }
+            dirs.push(dir);
+        }
+        for dir in dirs.iter().rev() {
+            self.sftp
+                .remove_dir(dir.as_str())
+                .await
+                .map_err(|e| failure(dir, e))?;
+        }
+        Ok(())
+    }
+
+    async fn remove_file(&self, path: &str) -> Result<(), Failure> {
+        self.sftp
+            .remove_file(path)
+            .await
+            .map_err(|e| failure(path, e))
+    }
+}
+
+fn join(dir: &str, name: &str) -> String {
+    if dir.ends_with('/') {
+        format!("{dir}{name}")
+    } else {
+        format!("{dir}/{name}")
+    }
 }
 
 /// A failed request, and whether the connection itself is unusable.
@@ -385,6 +449,12 @@ mod tests {
     }
 
     #[test]
+    fn joins_names_onto_folders() {
+        assert_eq!(join("/", "etc"), "/etc");
+        assert_eq!(join("/home/me", "a b"), "/home/me/a b");
+    }
+
+    #[test]
     fn formats_times_as_utc_dates() {
         assert_eq!(format_time(951_782_400), "2000-02-29 00:00 UTC");
         assert_eq!(format_time(1_792_576_140), "2026-10-21 09:49 UTC");
@@ -510,6 +580,41 @@ mod local_server_tests {
             let replaced = get().await.unwrap();
             assert!(!Arc::ptr_eq(&connection, &replaced));
             assert_eq!(names(&replaced.list(None).await.unwrap()).len(), 2);
+        });
+    }
+
+    #[test]
+    fn deletes_files_and_folders_recursively() {
+        let dir = tempfile::tempdir().unwrap();
+        let Some(_) = server(dir.path()) else {
+            return;
+        };
+        let tree = dir.path().join("my folder");
+        std::fs::create_dir_all(tree.join("sub dir/deeper")).unwrap();
+        std::fs::write(tree.join("a.txt"), "a").unwrap();
+        std::fs::write(tree.join("sub dir/máy chủ.txt"), "b").unwrap();
+        std::fs::write(tree.join("sub dir/deeper/c"), "c").unwrap();
+        std::fs::write(dir.path().join("keep.txt"), "k").unwrap();
+        std::fs::write(dir.path().join("it's gone.txt"), "x").unwrap();
+
+        runtime().block_on(async {
+            let connections = Connections::default();
+            let connection = connections
+                .get("tab", "local", None, || server(dir.path()).unwrap())
+                .await
+                .unwrap();
+            let root = connection.list(None).await.unwrap().path;
+            connection.delete(&root, "it's gone.txt").await.unwrap();
+            connection.delete(&root, "my folder").await.unwrap();
+            assert_eq!(names(&connection.list(None).await.unwrap()), ["keep.txt"]);
+
+            let missing = connection.delete(&root, "nothing").await.unwrap_err();
+            assert_eq!(missing.error.kind, ErrorKind::Remote);
+            assert!(!missing.lost);
+            for bad in ["", ".", "..", "a/b"] {
+                assert!(connection.delete(&root, bad).await.is_err(), "{bad:?}");
+            }
+            assert!(dir.path().join("keep.txt").exists());
         });
     }
 

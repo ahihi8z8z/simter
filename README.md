@@ -35,8 +35,11 @@ Simter reads `%USERPROFILE%\.ssh\config` and never writes to it. Add hosts there
 - **Terminal**: every key, including F1–F12 and Ctrl+B, goes to the remote side. Copy with
   Ctrl+Shift+C (or Ctrl+C while text is selected); paste with Ctrl+V or Ctrl+Shift+V.
 - **Files** (right side bar): the active tab's host over SFTP. Double-click or Enter opens a
-  folder, Backspace goes up, or type a path. **Upload files…**, **Upload folder…** and
-  **Download…** run one at a time; an existing target asks Overwrite, Skip or Cancel.
+  folder, Backspace goes up, or type a path. Right-click (or press the context-menu key or
+  Shift+F10): on empty space for **Upload files…** and **Upload folder…**, on an item for
+  **Download…** and **Delete…**. Transfers run one at a time; an existing target asks Overwrite,
+  Skip or Cancel. Delete asks first and cannot be undone: a folder goes with everything in it,
+  and a link is deleted without touching what it points to.
 - **Layout**: click a view's header to collapse it, drag the dividers to resize, and use the
   panel button at the far right to hide the side bar. The layout is saved.
 - **Passwords**: password, passphrase and new host-key prompts appear in a dialog, once per tab

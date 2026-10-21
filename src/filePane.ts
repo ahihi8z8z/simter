@@ -1,7 +1,8 @@
 import { open } from "@tauri-apps/plugin-dialog";
-import { cancelTransfer, downloadEntry, listRemote, uploadPath, type Entry, type SftpError } from "./api";
+import { cancelTransfer, deleteRemote, downloadEntry, listRemote, uploadPath, type Entry, type SftpError } from "./api";
+import { isMenuOpen, showMenu, type MenuItem } from "./contextMenu";
 import { moveSelection } from "./hostList";
-import { describeSftpError, formatSize, joinPath, parentPath, sortEntries } from "./remotePath";
+import { deleteWarning, describeSftpError, formatSize, joinPath, parentPath, sortEntries } from "./remotePath";
 import { baseName, withConflictCheck, type Choice } from "./transfers";
 
 const icons: Record<Entry["kind"], string> = { dir: "📁", file: "📄", link: "🔗", other: "⚙" };
@@ -49,6 +50,42 @@ function askConflict(message: string): Promise<Choice> {
       "close",
       () => {
         resolve((dialog.returnValue || "cancel") as Choice);
+        dialog.remove();
+      },
+      { once: true },
+    );
+  });
+}
+
+/** Asks before a permanent delete. Escape and the default button mean Cancel. */
+function confirmDelete(message: string): Promise<boolean> {
+  const dialog = document.createElement("dialog");
+  dialog.className = "conflict";
+  const form = document.createElement("form");
+  form.method = "dialog";
+  const text = document.createElement("p");
+  text.className = "delete-warning";
+  text.textContent = message;
+  const actions = document.createElement("div");
+  actions.className = "conflict-actions";
+  const remove = button("Delete", "Delete permanently");
+  remove.type = "submit";
+  remove.value = "delete";
+  remove.className = "danger";
+  const cancel = button("Cancel", "Keep it");
+  cancel.type = "submit";
+  cancel.value = "cancel";
+  cancel.autofocus = true;
+  actions.append(remove, cancel);
+  form.append(text, actions);
+  dialog.append(form);
+  document.body.append(dialog);
+  dialog.showModal();
+  return new Promise((resolve) => {
+    dialog.addEventListener(
+      "close",
+      () => {
+        resolve(dialog.returnValue === "delete");
         dialog.remove();
       },
       { once: true },
@@ -114,15 +151,15 @@ class TransferRow {
 }
 
 /**
- * Remote file browser for one host. Each listing is a separate
- * `sftp -b -` run; keys here act only while the pane has focus.
+ * Remote file browser for one host, over the tab's SFTP connection. Right-click (or the
+ * context-menu key) offers upload on empty space and download/delete on an item; keys here act
+ * only while the pane has focus.
  */
 export class FilePane {
   readonly element: HTMLElement;
   private readonly pathInput: HTMLInputElement;
   private readonly upButton: HTMLButtonElement;
   private readonly refreshButton: HTMLButtonElement;
-  private readonly downloadButton: HTMLButtonElement;
   private readonly status: HTMLDivElement;
   private readonly list: HTMLUListElement;
   private readonly transfers: HTMLUListElement;
@@ -159,22 +196,30 @@ export class FilePane {
     this.list.className = "file-list";
     this.list.role = "listbox";
     this.list.tabIndex = 0;
+    this.list.title = "Right-click for upload, download and delete";
 
-    const actions = document.createElement("div");
-    actions.className = "file-actions";
-    const uploadFiles = button("Upload files…", "Upload files into this folder");
-    const uploadFolder = button("Upload folder…", "Upload a folder into this folder");
-    this.downloadButton = button("Download…", "Download the selected item to a local folder");
-    this.downloadButton.disabled = true;
-    actions.append(uploadFiles, uploadFolder, this.downloadButton);
     this.transfers = document.createElement("ul");
     this.transfers.className = "transfers";
     this.transfers.ariaLabel = "Transfers";
-    this.element.append(toolbar, this.status, this.list, actions, this.transfers);
+    this.element.append(toolbar, this.status, this.list, this.transfers);
 
-    uploadFiles.addEventListener("click", () => void this.upload(false));
-    uploadFolder.addEventListener("click", () => void this.upload(true));
-    this.downloadButton.addEventListener("click", () => void this.download());
+    // A right-click starts with a pointerdown; the context-menu key and Shift+F10 do not.
+    let fromPointer = false;
+    this.list.addEventListener("pointerdown", (e) => (fromPointer = e.button === 2));
+    this.list.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      const pointer = fromPointer;
+      fromPointer = false;
+      if (!pointer) {
+        // Keyboard: handled on keydown, unless the WebView did not deliver that key.
+        if (!isMenuOpen()) this.openMenuForKeyboard();
+        return;
+      }
+      const item = (e.target as Element).closest<HTMLElement>(".file");
+      const index = item ? Number(item.dataset.index) : -1;
+      if (index >= 0) this.select(index);
+      this.openMenu(index, e.clientX, e.clientY);
+    });
 
     this.upButton.addEventListener("click", () => this.up());
     this.refreshButton.addEventListener("click", () => void this.load(this.path ?? undefined));
@@ -251,8 +296,57 @@ export class FilePane {
     if ((await this.runJobs(jobs)) && this.path === remoteDir) void this.load(remoteDir);
   }
 
-  private async download(): Promise<void> {
-    const entry = this.entries[this.selected];
+  /** The menu for item `index`, or for the folder itself when there is none. */
+  private openMenu(index: number, x: number, y: number): void {
+    const entry = this.entries[index];
+    const noFolder = this.path === null;
+    const items: MenuItem[] = entry
+      ? [
+          {
+            label: "Download…",
+            title: "Download to a local folder",
+            disabled: entry.kind === "other",
+            run: () => void this.download(entry),
+          },
+          { label: "Delete…", title: "Delete permanently from the host", danger: true, run: () => void this.delete(entry) },
+        ]
+      : [
+          { label: "Upload files…", title: "Upload files into this folder", disabled: noFolder, run: () => void this.upload(false) },
+          { label: "Upload folder…", title: "Upload a folder into this folder", disabled: noFolder, run: () => void this.upload(true) },
+        ];
+    showMenu(x, y, items, this.list);
+  }
+
+  /** Context-menu key or Shift+F10: the menu for the selected item, beside it. */
+  private openMenuForKeyboard(): void {
+    const item = this.list.querySelector<HTMLElement>('[aria-selected="true"]');
+    const rect = (item ?? this.list).getBoundingClientRect();
+    this.openMenu(item ? this.selected : -1, rect.left + 16, item ? rect.bottom : rect.top + 4);
+  }
+
+  private async delete(entry: Entry): Promise<void> {
+    const remoteDir = this.path;
+    if (remoteDir === null) return;
+    if (!(await confirmDelete(deleteWarning(this.alias, remoteDir, entry)))) return;
+    const generation = ++this.generation;
+    this.setBusy(true);
+    this.showStatus(`Deleting ${joinPath(remoteDir, entry.name)}…`);
+    try {
+      await deleteRemote(this.session, this.alias, remoteDir, entry.name, this.configPath);
+    } catch (e) {
+      if (generation !== this.generation) return;
+      this.setBusy(false);
+      const { message, hint } = describeSftpError(e as SftpError);
+      // A folder stops at the first item it cannot delete; what came before is gone.
+      const partly = entry.kind === "dir" ? "Part of the folder may be deleted; Refresh to see what is left." : null;
+      const lines = [`Not deleted: ${message}`, hint, partly].filter((line) => line !== null);
+      this.showStatus(lines.join("\n"), "error");
+      return;
+    }
+    if (generation === this.generation && this.path === remoteDir) void this.load(remoteDir);
+  }
+
+  private async download(entry: Entry): Promise<void> {
     const remoteDir = this.path;
     if (!entry || entry.kind === "other" || remoteDir === null) return;
     const localDir = await open({
@@ -323,6 +417,7 @@ export class FilePane {
         item.role = "option";
         item.className = "file";
         item.ariaSelected = String(i === this.selected);
+        item.dataset.index = String(i);
         item.title = `${entry.name}\n${entry.modified}`;
         const icon = document.createElement("span");
         icon.className = "file-icon";
@@ -340,11 +435,14 @@ export class FilePane {
       }),
     );
     this.list.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: "nearest" });
-    const entry = this.entries[this.selected];
-    this.downloadButton.disabled = !entry || entry.kind === "other";
   }
 
   private handleListKey(e: KeyboardEvent): void {
+    if (e.key === "ContextMenu" || (e.key === "F10" && e.shiftKey)) {
+      e.preventDefault();
+      this.openMenuForKeyboard();
+      return;
+    }
     switch (e.key) {
       case "ArrowDown":
       case "ArrowUp":

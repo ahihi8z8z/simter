@@ -159,6 +159,14 @@ export function listRemote(session: string, alias: string, path?: string, config
   return invoke<Listing>("sftp_list", { session, alias, path: path ?? null, configPath: configPath ?? null });
 }
 
+/**
+ * Permanently deletes `name` in `remoteDir`; a folder goes with everything in it, and a link is
+ * deleted without following it. Rejects with an SftpError.
+ */
+export function deleteRemote(session: string, alias: string, remoteDir: string, name: string, configPath?: string): Promise<void> {
+  return invoke("sftp_delete", { session, alias, remoteDir, name, configPath: configPath ?? null });
+}
+
 /** Closes the tab's SFTP browsing connection. */
 export function closeRemote(session: string): Promise<void> {
   return invoke("sftp_close", { session });

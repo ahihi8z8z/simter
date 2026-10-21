@@ -562,18 +562,6 @@ button:disabled {
   color: var(--muted);
 }
 
-.file-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  padding: 6px;
-  border-top: 1px solid var(--border);
-}
-
-.file-actions button {
-  padding: 2px 8px;
-}
-
 .transfers {
   max-height: 30%;
   margin: 0;
@@ -643,6 +631,52 @@ dialog.conflict {
   display: flex;
   gap: 6px;
   justify-content: flex-end;
+}
+
+.delete-warning {
+  white-space: pre-line;
+}
+
+button.danger {
+  border-color: var(--error);
+  background: var(--error);
+  color: var(--bg);
+}
+
+.context-menu {
+  position: fixed;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  min-width: 160px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 20%);
+}
+
+.context-menu button {
+  padding: 4px 10px;
+  border: none;
+  background: none;
+  text-align: left;
+}
+
+.context-menu button:not(:disabled):hover,
+.context-menu button:focus-visible {
+  background: var(--selected);
+  outline: none;
+}
+
+.context-menu button.danger {
+  background: none;
+  color: var(--error);
+}
+
+.context-menu button.danger:not(:disabled):hover,
+.context-menu button.danger:focus-visible {
+  background: var(--selected);
 }
 
 #placeholder {

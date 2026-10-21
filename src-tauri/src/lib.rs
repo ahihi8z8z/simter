@@ -45,6 +45,7 @@ pub fn run() {
             commands::prefs_record_host,
             commands::sftp_list,
             commands::sftp_close,
+            commands::sftp_delete,
             commands::sftp_upload,
             commands::sftp_download,
             commands::transfer_cancel,

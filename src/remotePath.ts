@@ -48,3 +48,14 @@ const hints: Partial<Record<SftpError["kind"], string>> = {
 export function describeSftpError(error: SftpError): { message: string; hint: string | null } {
   return { message: error.message, hint: hints[error.kind] ?? null };
 }
+
+/** The warning shown before permanently deleting `entry` from `dir` on `alias`. */
+export function deleteWarning(alias: string, dir: string, entry: Entry): string {
+  const what = entry.kind === "dir" ? "folder" : entry.kind === "link" ? "link" : "file";
+  const path = joinPath(dir, entry.name);
+  const lines = [`Permanently delete the ${what} “${entry.name}” from ${alias}?`, path];
+  if (entry.kind === "dir") lines.push("Everything inside it is deleted too.");
+  else if (entry.kind === "link") lines.push("Only the link is deleted, not what it points to.");
+  lines.push("This cannot be undone: there is no recycle bin on the remote host.");
+  return lines.join("\n");
+}

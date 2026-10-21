@@ -86,7 +86,7 @@ The existing **OpenSSH → Byobu/tmux on the server** behavior must remain intac
 - Do not silently overwrite an existing destination file; require explicit confirmation or a clearly defined conflict policy.
 - Support key authentication and SSH config options (notably `ProxyJump`, custom ports, and identity files) through the underlying SSH toolchain.
 - If an OpenSSH config feature cannot be honored by the chosen transfer implementation, report it explicitly rather than silently using an incorrect connection.
-- Do not implement destructive remote operations (delete, recursive delete, chmod, rename) in the initial MVP.
+- Delete (a folder recursively) is the only destructive remote operation. It must ask for explicit confirmation that names the item, says that a folder's contents go too, and warns that it cannot be undone; links are deleted, never followed. Do not implement chmod or rename.
 
 ### FR-5: Configuration and local state
 

@@ -81,6 +81,19 @@ the server (and the reverse for downloads).
 | 4.12 | Host whose config sets `RemoteCommand byobu` / `RequestTTY yes` | Files list normally; no Byobu session is started by the file pane | | |
 | 4.13 | Browse, then drop the network (or `kill` the tab's `sftp-server`), then Refresh | At most one clear error (a dropped network times out after 30 s); the next Refresh reconnects and lists | | |
 
+### 4b. Right-click menu and delete
+
+Use a disposable folder on the server; check the results there with `ls -la`.
+
+| # | Step | Expected | Result | Notes |
+|---|---|---|---|---|
+| 4b.1 | Right-click empty space below the list; then right-click a file | Empty space: Upload files…, Upload folder…; item: Download…, Delete…; no upload/download buttons in the pane | | |
+| 4b.2 | Select an item with the arrow keys, press the context-menu key or Shift+F10; navigate with Up/Down, Escape | Menu opens beside the selected item; Escape closes it and focus returns to the list; F2–F9 still reach Byobu in the terminal | | |
+| 4b.3 | Delete… a file, press Escape (or Cancel) | Warning names the file and path and says it cannot be undone; file still on the server | | |
+| 4b.4 | Delete… `my folder` with nested sub-folders and `máy chủ.txt`, confirm | Warning says its contents go too; folder gone; listing refreshes | | |
+| 4b.5 | Delete… a symlink to a folder (`ln -s /etc/ssh link`), confirm | Only the link is removed; `/etc/ssh` untouched | | |
+| 4b.6 | Delete… a folder containing a root-owned file (no permission) | Error says not deleted and part of the folder may be gone; Refresh shows what is left | | |
+
 ### 5. Conflicts
 
 | # | Step | Expected | Result | Notes |

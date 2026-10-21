@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Entry } from "./api";
-import { describeSftpError, formatSize, joinPath, parentPath, sortEntries } from "./remotePath";
+import { deleteWarning, describeSftpError, formatSize, joinPath, parentPath, sortEntries } from "./remotePath";
 
 describe("joinPath", () => {
   it("adds one separator", () => {
@@ -50,5 +50,31 @@ describe("describeSftpError", () => {
       message: "stat remote: No such file or directory",
       hint: null,
     });
+  });
+});
+
+describe("deleteWarning", () => {
+  const entry = (kind: Entry["kind"], name: string): Entry => ({ name, kind, size: 0, modified: "" });
+
+  it("says a folder goes with its contents and cannot be restored", () => {
+    const text = deleteWarning("web", "/srv", entry("dir", "my site"));
+    expect(text).toContain("folder “my site” from web");
+    expect(text).toContain("/srv/my site");
+    expect(text).toContain("Everything inside it is deleted too.");
+    expect(text).toContain("cannot be undone");
+  });
+
+  it("says only a link itself is deleted", () => {
+    const text = deleteWarning("web", "/", entry("link", "current"));
+    expect(text).toContain("link “current”");
+    expect(text).toContain("/current");
+    expect(text).toContain("not what it points to");
+  });
+
+  it("describes a file", () => {
+    const text = deleteWarning("web", "/srv", entry("file", "a.txt"));
+    expect(text).toContain("file “a.txt”");
+    expect(text).not.toContain("Everything inside");
+    expect(text).toContain("cannot be undone");
   });
 });
