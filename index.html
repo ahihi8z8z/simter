@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Simter</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <main id="workspace">
+      <div id="tabs" role="tablist" aria-label="Open sessions" hidden></div>
+      <div id="session-bar" hidden>
+        <span id="session-title"></span>
+        <span id="session-status"></span>
+        <button
+          id="reconnect"
+          type="button"
+          title="Run ssh again in this tab. Remote Byobu/tmux sessions reattach only if your login does so (e.g. byobu-enable); otherwise run byobu."
+          hidden
+        >
+          Reconnect
+        </button>
+      </div>
+      <div id="terminal-host"></div>
+      <p id="placeholder">Select a host and press Enter to connect.</p>
+    </main>
+    <aside id="sidebar" aria-label="Side bar">
+      <section id="hosts-view" class="view">
+        <button class="view-head" type="button" aria-expanded="true" aria-controls="hosts-body">
+          <span class="chevron" aria-hidden="true"></span>Hosts
+        </button>
+        <div id="hosts-body" class="view-body">
+          <div class="sidebar-head">
+            <input id="search" type="search" placeholder="Search hosts" autocomplete="off" spellcheck="false" autofocus />
+            <button id="refresh" type="button" title="Re-read SSH config">Refresh</button>
+          </div>
+          <div id="issues" hidden>
+            <button id="issues-toggle" type="button"></button>
+            <ul id="issues-list" hidden></ul>
+          </div>
+          <ul id="host-list" role="listbox" aria-label="SSH hosts"></ul>
+          <div class="sidebar-foot">
+            <button id="config-path" type="button"></button>
+            <button id="open-config" type="button" disabled title="Open the SSH config in an editor, at the selected host when possible. Refresh after saving.">
+              Open config
+            </button>
+            <button id="connect" type="button" disabled>Connect</button>
+          </div>
+        </div>
+      </section>
+      <section id="files-view" class="view">
+        <button class="view-head" type="button" aria-expanded="true" aria-controls="files-host">
+          <span class="chevron" aria-hidden="true"></span>Files<span id="files-title"></span>
+        </button>
+        <div id="files-host" class="view-body">
+          <p id="files-empty">Connect to a host to browse its files.</p>
+        </div>
+      </section>
+    </aside>
+    <nav id="activity-bar" aria-label="Activity bar">
+      <button id="sidebar-toggle" type="button" title="Show or hide the side bar (hosts and files)" aria-pressed="true">
+        <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+          <rect x="1.5" y="2.5" width="13" height="11" rx="1.5" fill="none" stroke="currentColor" />
+          <rect x="10" y="3" width="4" height="10" fill="currentColor" />
+        </svg>
+      </button>
+    </nav>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

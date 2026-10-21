@@ -1,0 +1,683 @@
+:root {
+  --bg: #ffffff;
+  --panel: #f4f5f7;
+  --text: #1d1f23;
+  --muted: #6b7280;
+  --border: #d9dce1;
+  --accent: #2563eb;
+  --accent-text: #ffffff;
+  --selected: #dbe6fd;
+  --error: #b42318;
+  --warning: #9a6700;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  font-size: 14px;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #17191d;
+    --panel: #1f2227;
+    --text: #e6e8eb;
+    --muted: #9aa1ab;
+    --border: #33373e;
+    --accent: #4f8cff;
+    --selected: #24395f;
+    --error: #ff8a80;
+    --warning: #f0c060;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  display: flex;
+  background: var(--bg);
+  color: var(--text);
+}
+
+button {
+  font: inherit;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Right side bar: Hosts above Files, each collapsible, like VS Code's views. */
+#sidebar {
+  display: flex;
+  flex: 0 0 340px;
+  flex-direction: column;
+  min-width: 200px;
+  /* A saved width may not fit a smaller window; keep the terminal usable. */
+  max-width: calc(100% - 240px);
+  background: var(--panel);
+}
+
+#sidebar[hidden],
+.splitter[hidden] {
+  display: none;
+}
+
+.view {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+#hosts-view {
+  flex: 1 1 0;
+}
+
+#files-view {
+  flex: 0 0 55%;
+  border-top: 1px solid var(--border);
+}
+
+#sidebar.hosts-collapsed #files-view {
+  flex-grow: 1;
+}
+
+.view.collapsed {
+  flex: 0 0 auto !important;
+}
+
+.view-head {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  width: 100%;
+  padding: 4px 6px;
+  overflow: hidden;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: left;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.view-head:hover {
+  background: var(--selected);
+}
+
+.chevron::before {
+  display: inline-block;
+  width: 12px;
+  content: "▾";
+}
+
+.view.collapsed .chevron::before {
+  content: "▸";
+}
+
+#files-title {
+  font-weight: 400;
+  text-transform: none;
+}
+
+.view-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.view.collapsed .view-body {
+  display: none;
+}
+
+#files-empty {
+  margin: 8px;
+  color: var(--muted);
+}
+
+#activity-bar {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  padding: 4px 0;
+  background: var(--panel);
+  border-left: 1px solid var(--border);
+}
+
+#sidebar-toggle {
+  display: flex;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+}
+
+#sidebar-toggle[aria-pressed="true"],
+#sidebar-toggle:hover {
+  color: var(--text);
+}
+
+.sidebar-head,
+.sidebar-foot {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 8px;
+}
+
+.sidebar-foot {
+  border-top: 1px solid var(--border);
+}
+
+#search {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+#host-list {
+  flex: 1;
+  margin: 0;
+  padding: 0 4px;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.host {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 5px 8px;
+  border-radius: 4px;
+  flex-wrap: wrap;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.details {
+  flex-basis: 100%;
+  order: 1;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.details.unavailable {
+  font-style: italic;
+}
+
+.host[aria-selected="true"] {
+  background: var(--selected);
+}
+
+/* Separates recently opened hosts from the rest. */
+.host.recent-last {
+  position: relative;
+  margin-bottom: 9px;
+}
+
+.host.recent-last::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: -5px;
+  border-top: 1px solid var(--border);
+}
+
+.badge {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.empty {
+  padding: 8px;
+  color: var(--muted);
+}
+
+#issues {
+  margin: 0 8px 6px;
+  font-size: 12px;
+}
+
+#issues-toggle {
+  width: 100%;
+  text-align: left;
+  color: var(--warning);
+}
+
+#issues.has-errors #issues-toggle {
+  color: var(--error);
+}
+
+#issues-list {
+  max-height: 160px;
+  margin: 4px 0 0;
+  padding: 0 0 0 16px;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+}
+
+#issues-list .error {
+  color: var(--error);
+}
+
+#issues-list .warning {
+  color: var(--warning);
+}
+
+#config-path {
+  flex: 1;
+  min-width: 0;
+  padding: 2px 0;
+  overflow: hidden;
+  border: none;
+  background: none;
+  font-size: 12px;
+  text-align: left;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#connect {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+#workspace {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+#tabs {
+  display: flex;
+  overflow-x: auto;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+
+#tabs[hidden] {
+  display: none;
+}
+
+.tab {
+  display: flex;
+  flex-shrink: 0;
+  gap: 6px;
+  align-items: center;
+  max-width: 220px;
+  padding: 4px 4px 4px 10px;
+  border-right: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.tab[aria-selected="true"] {
+  background: var(--bg);
+}
+
+.tab-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab-state {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.tab[data-state="connecting"] .tab-state {
+  background: var(--warning);
+}
+
+.tab[data-state="connected"] .tab-state {
+  background: #22a35a;
+}
+
+.tab[data-state="failed"] .tab-state {
+  background: var(--error);
+}
+
+.tab-close {
+  padding: 0 6px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+}
+
+.tab-close:hover {
+  color: var(--text);
+}
+
+#session-bar {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+#session-bar[hidden] {
+  display: none;
+}
+
+#session-title {
+  font-weight: 600;
+}
+
+#session-status {
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#session-status[data-status="failed"] {
+  color: var(--error);
+}
+
+#reconnect {
+  margin-left: auto;
+  padding: 2px 10px;
+}
+
+#reconnect[hidden] {
+  display: none;
+}
+
+#terminal-host {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  background: #000;
+}
+
+#terminal-host:empty {
+  display: none;
+}
+
+.terminal {
+  flex: 1;
+  min-width: 0;
+  padding: 4px;
+}
+
+.tab-body {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+
+.tab-body[hidden] {
+  display: none;
+}
+
+.splitter {
+  flex: 0 0 5px;
+  background: var(--border);
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.splitter.horizontal {
+  flex-basis: 4px;
+  cursor: row-resize;
+}
+
+.splitter:hover,
+.splitter:focus-visible,
+.splitter.dragging {
+  background: var(--accent);
+  outline: none;
+}
+
+.file-pane {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--bg);
+}
+
+.file-pane[hidden] {
+  display: none;
+}
+
+.file-toolbar {
+  display: flex;
+  gap: 4px;
+  padding: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.file-toolbar button {
+  padding: 2px 8px;
+}
+
+.file-path {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 12px;
+  padding: 3px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.file-status {
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.file-status[data-tone="warning"] {
+  color: var(--warning);
+}
+
+.file-status[data-tone="error"] {
+  color: var(--error);
+}
+
+.file-pane.busy .file-list {
+  opacity: 0.6;
+}
+
+.file-list {
+  flex: 1;
+  margin: 0;
+  padding: 0 4px 4px;
+  overflow-y: auto;
+  list-style: none;
+  outline: none;
+}
+
+.file {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 3px 6px;
+  border-radius: 4px;
+  cursor: default;
+  user-select: none;
+}
+
+.file[aria-selected="true"] {
+  background: var(--selected);
+}
+
+.file-list:focus-visible .file[aria-selected="true"] {
+  outline: 1px solid var(--accent);
+}
+
+.file-icon {
+  flex-shrink: 0;
+  width: 1.4em;
+  text-align: center;
+}
+
+.file-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: pre;
+}
+
+.file-size {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.file-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px;
+  border-top: 1px solid var(--border);
+}
+
+.file-actions button {
+  padding: 2px 8px;
+}
+
+.transfers {
+  max-height: 30%;
+  margin: 0;
+  padding: 0 4px;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.transfers:empty {
+  display: none;
+}
+
+.transfer {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 2px 6px;
+  font-size: 12px;
+}
+
+.transfer-arrow {
+  flex-shrink: 0;
+}
+
+.transfer-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: pre;
+}
+
+.transfer-status {
+  flex-shrink: 1;
+  min-width: 0;
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.transfer[data-state="failed"] .transfer-status {
+  color: var(--error);
+}
+
+.transfer[data-state="skipped"] .transfer-status,
+.transfer[data-state="cancelled"] .transfer-status {
+  color: var(--warning);
+}
+
+.transfer-action {
+  flex-shrink: 0;
+  padding: 0 6px;
+}
+
+dialog.conflict {
+  max-width: 420px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.conflict-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+#placeholder {
+  margin: auto;
+  color: var(--muted);
+}
+
+dialog.askpass {
+  max-width: 520px;
+}
+
+dialog.askpass h2 {
+  margin: 0 0 8px;
+  font-size: 1em;
+}
+
+dialog.askpass pre {
+  margin: 0 0 8px;
+  white-space: pre-wrap;
+  font-size: 0.9em;
+}
+
+dialog.askpass input[type="password"] {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 10px;
+}
+
+.askpass-save {
+  display: block;
+  margin-bottom: 10px;
+}
+
+.askpass-retry {
+  margin: 0 0 8px;
+  color: var(--error);
+}

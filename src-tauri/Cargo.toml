@@ -1,0 +1,30 @@
+[package]
+name = "simter"
+version = "0.1.0"
+description = "Simter (simple terminal): SSH host list, embedded terminal, SFTP file pane"
+edition = "2021"
+
+[lib]
+name = "simter_lib"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+getrandom = "0.3"
+glob = "0.3"
+portable-pty = "0.9"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+# Already used by Tauri's async runtime; named pipes for the askpass helper.
+tokio = { version = "1", features = ["io-util", "net", "sync"] }
+
+# Same versions Tauri's WebView2 backend uses, to reach the browser settings it does not expose.
+[target.'cfg(windows)'.dependencies]
+webview2-com = "0.39"
+windows = { version = "0.62", features = ["Win32_Foundation", "Win32_Security_Credentials"] }
+
+[dev-dependencies]
+tempfile = "3"
