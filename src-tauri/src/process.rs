@@ -43,6 +43,11 @@ pub fn pause_timeouts() -> TimeoutPause {
     TimeoutPause(())
 }
 
+/// True while any prompt is waiting for the user.
+pub fn timeouts_paused() -> bool {
+    PAUSES.load(Ordering::SeqCst) > 0
+}
+
 pub struct TimeoutPause(());
 
 impl Drop for TimeoutPause {
@@ -104,7 +109,7 @@ pub fn run_with(
     let mut last = Instant::now();
     let status = loop {
         let now = Instant::now();
-        if PAUSES.load(Ordering::SeqCst) == 0 {
+        if !timeouts_paused() {
             elapsed += now - last;
         }
         last = now;

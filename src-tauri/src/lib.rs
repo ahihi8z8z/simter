@@ -7,6 +7,7 @@ mod prefs;
 mod process;
 mod resolve;
 mod sftp;
+mod sftp_session;
 mod ssh_bin;
 mod terminal;
 mod transfer;
@@ -18,6 +19,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(terminal::Terminals::default())
         .manage(transfer::Transfers::default())
+        .manage(sftp_session::Connections::default())
         .setup(|app| {
             let handle = app.handle().clone();
             let broker = askpass::Broker::new(
@@ -42,6 +44,7 @@ pub fn run() {
             commands::prefs_set_layout,
             commands::prefs_record_host,
             commands::sftp_list,
+            commands::sftp_close,
             commands::sftp_upload,
             commands::sftp_download,
             commands::transfer_cancel,

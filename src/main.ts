@@ -1,5 +1,6 @@
 import { message, open } from "@tauri-apps/plugin-dialog";
 import {
+  closeRemote,
   endAskpassSession,
   hostDetails,
   listHosts,
@@ -249,6 +250,7 @@ function closeTab(tab: Tab): void {
   const next = nextAfterClose(index, tabs.length);
   tabs.splice(index, 1);
   tab.view.dispose();
+  void closeRemote(tab.session);
   void endAskpassSession(tab.session);
   tab.body.remove();
   tab.files.element.remove();

@@ -14,12 +14,16 @@ tauri-build = { version = "2", features = [] }
 getrandom = "0.3"
 glob = "0.3"
 portable-pty = "0.9"
+# SFTP protocol client for the file pane's long-lived `ssh -s` connection;
+# it has no SSH or crypto code of its own.
+russh-sftp = "3"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
-# Already used by Tauri's async runtime; named pipes for the askpass helper.
-tokio = { version = "1", features = ["io-util", "net", "sync"] }
+# Already used by Tauri's async runtime; named pipes for the askpass helper,
+# and the file pane's ssh process.
+tokio = { version = "1", features = ["io-util", "macros", "net", "process", "rt", "sync", "time"] }
 
 # Same versions Tauri's WebView2 backend uses, to reach the browser settings it does not expose.
 [target.'cfg(windows)'.dependencies]

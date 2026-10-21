@@ -11,6 +11,7 @@ src-tauri/src/
   hosts/          Host/Include discovery + `ssh -G` resolution
   terminal.rs     ConPTY session: spawn `ssh <alias>`, I/O, resize, exit
   sftp/           list, upload, download, conflict checks, error types
+  sftp_session.rs long-lived per-tab SFTP connection for browsing
   config_open.rs  open config in an editor at a line
   prefs.rs        app-only preferences JSON in %APPDATA%
 src/              TypeScript UI: sidebar, tabs, splitter, xterm.js, file pane
@@ -41,9 +42,15 @@ docs/             design notes, testbed report template
 - **No shell interpolation:** the alias is passed as a discrete argv element (FR-2).
 - **Remote listing:** parse `sftp` `ls -la` output. The listing is formatted client-side by
   OpenSSH's sftp, so the layout is deterministic, and it works on SFTP-only servers.
-- **One sftp process per operation** for the MVP: simple, failure-isolated, cancel = kill.
-  Cost: connection setup per operation (slower through jump hosts). A long-lived session can
-  come later.
+- **Transfers: one sftp process per operation**: simple, failure-isolated, cancel = kill.
+  Cost: connection setup per transfer (slower through jump hosts).
+- **Browsing: one long-lived connection per tab** (`sftp_session.rs`), so changing folders does
+  not reconnect. Windows `sftp.exe` buffers its output when piped, so it cannot be driven
+  interactively; instead the app runs `ssh -s <alias> sftp` (the same arguments sftp.exe
+  passes, including `RemoteCommand=none`) and the russh-sftp crate speaks SFTP over its
+  stdin/stdout. OpenSSH still does config, authentication and host keys. A request that
+  times out or a dead ssh process drops the connection; the next request reconnects. Closing
+  the tab kills the process.
 - **Host keys:** the terminal handles prompts normally. The file pane uses `BatchMode=yes`,
   so an unknown host fails with guidance to accept the key in the terminal; never auto-accepted.
 - **Progress:** sftp prints no progress meter without a TTY, so the MVP shows

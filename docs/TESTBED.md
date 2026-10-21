@@ -77,6 +77,9 @@ the server (and the reverse for downloads).
 | 4.8 | New host (unknown key) in the file pane: Cancel, then Refresh and Accept | Cancel: host-key error, nothing written to known_hosts; Accept: fingerprint shown, listing works | | |
 | 4.9 | Password-only host: tick **Save password**, close and reopen the tab; then change the saved credential to a wrong value in Credential Manager and Refresh | Reopened tab lists without asking; `simter:<alias>:...` appears under Windows Credentials; a wrong saved password is removed and the dialog asks again | | |
 | 4.10 | Password-only host: open the tab, enter the password once, then Reconnect the terminal and list files | One dialog for the tab; the terminal logs in and later reconnects and listings do not ask again | | |
+| 4.11 | Through the ProxyJump host, open several folders in a row; on the server watch `ps -ef \| grep sftp-server` | Each folder opens without a new connection delay; one `sftp-server` per tab; it ends when the tab closes | | |
+| 4.12 | Host whose config sets `RemoteCommand byobu` / `RequestTTY yes` | Files list normally; no Byobu session is started by the file pane | | |
+| 4.13 | Browse, then drop the network (or `kill` the tab's `sftp-server`), then Refresh | At most one clear error (a dropped network times out after 30 s); the next Refresh reconnects and lists | | |
 
 ### 5. Conflicts
 

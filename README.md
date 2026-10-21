@@ -3,7 +3,9 @@
 Simter (Simple Terminal) is a lightweight Windows app for working on SSH hosts: a searchable
 host list from your SSH config, an embedded terminal per host, and an SFTP file pane in one
 window. It runs the Windows OpenSSH client (`ssh.exe`, `sftp.exe`) with your existing config,
-so keys, agents, `ProxyJump` and `Include` work as they do in a console. See [spec.md](spec.md)
+so keys, agents, `ProxyJump` and `Include` work as they do in a console. The file pane keeps one
+`ssh -s <alias> sftp` process per tab for browsing and speaks SFTP over it with
+[russh-sftp](https://crates.io/crates/russh-sftp), which has no SSH or crypto code of its own. See [spec.md](spec.md)
 for the full requirements.
 
 ## Install
@@ -49,7 +51,8 @@ No passwords or keys are stored in it.
 
 ## Limitations
 
-- Each file listing and transfer opens a new SFTP connection, which is slower through jump hosts.
+- Each transfer opens its own SFTP connection, which is slower through jump hosts. Browsing
+  reuses one connection per tab.
 - Transfers show their state but not byte progress. A cancelled upload may leave a partial file.
 - Remote paths containing a backslash, a line break, or both `'` and `"` cannot be opened.
 - Wildcard `Host` patterns are not listed; only concrete aliases are.

@@ -152,10 +152,16 @@ export interface SftpError {
 
 /**
  * Lists `path` on `alias` over SFTP (the login directory when omitted). Rejects with an SftpError.
- * `session` is the tab whose remembered passwords answer ssh's prompts.
+ * `session` is the tab whose remembered passwords answer ssh's prompts; the tab keeps one SFTP
+ * connection open for browsing until `closeRemote`.
  */
 export function listRemote(session: string, alias: string, path?: string, configPath?: string): Promise<Listing> {
   return invoke<Listing>("sftp_list", { session, alias, path: path ?? null, configPath: configPath ?? null });
+}
+
+/** Closes the tab's SFTP browsing connection. */
+export function closeRemote(session: string): Promise<void> {
+  return invoke("sftp_close", { session });
 }
 
 /**

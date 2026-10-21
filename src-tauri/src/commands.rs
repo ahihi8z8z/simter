@@ -13,6 +13,7 @@ use crate::hosts::{self, Host, Issue};
 use crate::prefs::{self, Layout, Prefs};
 use crate::resolve::{self, Details};
 use crate::sftp::{self, Listing};
+use crate::sftp_session::{self, Connection, Connections, Failure};
 use crate::ssh_bin;
 use crate::terminal::{self, PtySession, Terminals};
 use crate::transfer::{self, Transfers};
@@ -121,37 +122,75 @@ pub async fn host_details(alias: String, config_path: Option<PathBuf>) -> Result
     .map_err(|e| format!("host details task failed: {e}"))?
 }
 
-/// Lists `path` on `alias` over SFTP, or the login directory when `path` is
-/// absent. Prompts are answered within tab `session`.
+/// The tab's long-lived SFTP connection to `alias`, opened on first use.
+/// Prompts are answered within tab `session`.
+async fn sftp_connection(
+    broker: &Broker,
+    connections: &Connections,
+    session: &str,
+    alias: &str,
+    config_path: Option<&Path>,
+) -> Result<Arc<Connection>, sftp::Error> {
+    let ssh = ssh_bin::locate("ssh.exe")
+        .map_err(|m| sftp::Error::new(sftp::ErrorKind::Unavailable, m))?;
+    connections
+        .get(session, alias, config_path, || {
+            let mut cmd = tokio::process::Command::new(ssh);
+            cmd.args(sftp_session::ssh_args(config_path, alias));
+            for (name, value) in broker.askpass(session, alias).env() {
+                cmd.env(name, value);
+            }
+            cmd
+        })
+        .await
+}
+
+/// Lists `path` on `alias` over the tab's SFTP connection, or the login
+/// directory when `path` is absent.
 #[tauri::command]
 pub async fn sftp_list(
     broker: State<'_, Arc<Broker>>,
+    connections: State<'_, Connections>,
     session: String,
     alias: String,
     path: Option<String>,
     config_path: Option<PathBuf>,
 ) -> Result<Listing, sftp::Error> {
-    let broker = broker.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        let sftp = ssh_bin::locate("sftp.exe")
-            .map_err(|m| sftp::Error::new(sftp::ErrorKind::Unavailable, m))?;
-        let connect = || {
-            let askpass = broker.askpass(&session, &alias);
-            sftp::sftp_command(&sftp, config_path.as_deref(), &alias, Some(&askpass))
-        };
-        sftp::list(
-            &connect,
-            path.as_deref(),
-            std::time::Duration::from_secs(30),
-        )
-    })
-    .await
-    .map_err(|e| {
-        sftp::Error::new(
-            sftp::ErrorKind::Other,
-            format!("file listing task failed: {e}"),
-        )
-    })?
+    let connection = sftp_connection(
+        &broker,
+        &connections,
+        &session,
+        &alias,
+        config_path.as_deref(),
+    )
+    .await?;
+    let result = connection.list(path.as_deref()).await;
+    settle(&connections, &session, &connection, result).await
+}
+
+/// Drops the connection after a failure that left it unusable, so the next
+/// request reconnects.
+async fn settle<T>(
+    connections: &Connections,
+    session: &str,
+    connection: &Arc<Connection>,
+    result: Result<T, Failure>,
+) -> Result<T, sftp::Error> {
+    match result {
+        Ok(value) => Ok(value),
+        Err(failure) => {
+            if failure.lost {
+                connections.discard(session, connection).await;
+            }
+            Err(failure.error)
+        }
+    }
+}
+
+/// Closes the tab's SFTP connection.
+#[tauri::command]
+pub fn sftp_close(connections: State<'_, Connections>, session: String) {
+    connections.close(&session);
 }
 
 /// Runs one transfer off the UI thread with a cancel flag registered under
