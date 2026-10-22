@@ -58,6 +58,7 @@ issue or a fix commit reference.
 | 3.2 | Start `byobu`; press F2, F3, F4, F6, F7, F8, F9 | New window, prev/next window, detach, scrollback, rename, config menu as Byobu defines | | |
 | 3.3 | Resize the window and drag the divider; run `stty size` / watch Byobu redraw | Remote size follows the pane | | |
 | 3.4 | Copy (Ctrl+Shift+C / selection + Ctrl+C) and paste (Ctrl+V) | Clipboard works; Ctrl+C without selection interrupts | | |
+| 3.4b | In `byobu` (tmux backend, mouse on), drag-select text without pressing Ctrl+C; paste into Notepad | The selection is pasted, including Unicode and several lines | | |
 | 3.5 | F6 to detach, Reconnect, run `byobu` | Existing session reattached; app does not claim the old process survived | | |
 
 ### 4. File browsing and transfers

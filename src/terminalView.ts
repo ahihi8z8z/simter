@@ -4,6 +4,7 @@ import "@xterm/xterm/css/xterm.css";
 import { closeTerminal, openTerminal, resizeTerminal, writeTerminal, type Exit } from "./api";
 import { describeExit, type State } from "./connection";
 import { clipboardAction } from "./keys";
+import { osc52Text } from "./osc52";
 
 /**
  * One xterm.js terminal for a host. Each `connect()` runs a fresh
@@ -41,6 +42,12 @@ export class TerminalView {
     this.term.loadAddon(this.fit);
     this.term.attachCustomKeyEventHandler((e) => this.handleKey(e));
     this.term.onData((data) => this.send(data));
+    // A selection made in tmux/Byobu reaches the local clipboard as OSC 52, as in Windows Terminal.
+    this.term.parser.registerOscHandler(52, (data) => {
+      const text = osc52Text(data);
+      if (text !== null) navigator.clipboard.writeText(text).catch((err) => console.error("copy failed", err));
+      return true;
+    });
     this.term.onResize(({ cols, rows }) => {
       // Fails only after the process has exited, which is reported separately.
       if (this.id !== null) resizeTerminal(this.id, cols, rows).catch(() => {});

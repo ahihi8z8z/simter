@@ -33,7 +33,9 @@ Simter reads `%USERPROFILE%\.ssh\config` and never writes to it. Add hosts there
   failed. **Reconnect** runs `ssh` again in the same tab. Closing a tab ends only that ssh
   process; Byobu/tmux sessions keep running on the host.
 - **Terminal**: every key, including F1–F12 and Ctrl+B, goes to the remote side. Copy with
-  Ctrl+Shift+C (or Ctrl+C while text is selected); paste with Ctrl+V or Ctrl+Shift+V.
+  Ctrl+Shift+C (or Ctrl+C while text is selected); paste with Ctrl+V or Ctrl+Shift+V. Text
+  selected inside tmux/Byobu is copied too (OSC 52, as in Windows Terminal); the host can
+  write the clipboard this way but never read it.
 - **Files** (right side bar): the active tab's host over SFTP. Double-click or Enter opens a
   folder, Backspace goes up, or type a path. Right-click (or press the context-menu key or
   Shift+F10): on empty space for **Upload files…** and **Upload folder…**, on an item for
