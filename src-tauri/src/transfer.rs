@@ -104,7 +104,7 @@ pub fn download(
     if !overwrite && exists() {
         return Err(already_exists());
     }
-    let temp_name = format!(".{name}.{tag}.part");
+    let temp_name = temp_name(name, tag);
     let temp = local_dir.join(&temp_name);
     let script = download_script(&local_arg(local_dir)?, remote_dir, name, &temp_name)?;
     if let Err(e) = sftp::run_batch(connect, &script, None, Some(cancel)) {
@@ -130,6 +130,23 @@ pub fn download(
             ),
         )
     })
+}
+
+/// Where [`download`] writes `name` until it is complete.
+pub fn temp_name(name: &str, tag: &str) -> String {
+    format!(".{name}.{tag}.part")
+}
+
+/// Bytes in the local file or folder `path`, for progress. Links are not
+/// followed; anything missing or unreadable counts as nothing.
+pub fn local_size(path: &Path) -> u64 {
+    match fs::symlink_metadata(path) {
+        Ok(meta) if meta.is_dir() => fs::read_dir(path)
+            .map(|entries| entries.flatten().map(|e| local_size(&e.path())).sum())
+            .unwrap_or(0),
+        Ok(meta) if meta.is_file() => meta.len(),
+        _ => 0,
+    }
 }
 
 /// `cd`/`lcd` never glob, and sftp escapes glob characters inside quotes,
@@ -303,6 +320,18 @@ mod tests {
         assert_eq!(read(&["same.txt"]).unwrap(), "updated");
         assert_eq!(read(&["sub", "new.txt"]).unwrap(), "new");
         assert_eq!(read(&["sub", "kept.txt"]).unwrap(), "kept");
+    }
+
+    #[test]
+    fn measures_local_files_and_folders() {
+        let dir = tempfile::tempdir().unwrap();
+        let tree = dir.path().join("máy chủ");
+        fs::create_dir_all(tree.join("sub dir")).unwrap();
+        fs::write(tree.join("a.bin"), [0u8; 1000]).unwrap();
+        fs::write(tree.join("sub dir").join("b"), "12345").unwrap();
+        assert_eq!(local_size(&tree.join("a.bin")), 1000);
+        assert_eq!(local_size(&tree), 1005);
+        assert_eq!(local_size(&dir.path().join("missing")), 0);
     }
 
     #[test]

@@ -223,6 +223,38 @@ impl Connection {
         Ok(())
     }
 
+    /// Bytes in `path`: a file's size, or the total of the regular files in
+    /// a folder and its sub-folders. `path` itself is followed if it is a
+    /// link, as `get` does; links inside are not counted.
+    pub async fn size(&self, path: &str) -> Result<u64, Failure> {
+        let attrs = self
+            .sftp
+            .metadata(path)
+            .await
+            .map_err(|e| failure(path, e))?;
+        if kind_of(&attrs) != Kind::Dir {
+            return Ok(attrs.size.unwrap_or(0));
+        }
+        let mut total = 0;
+        let mut pending = vec![path.to_string()];
+        while let Some(dir) = pending.pop() {
+            let entries = self
+                .sftp
+                .read_dir(dir.as_str())
+                .await
+                .map_err(|e| failure(&dir, e))?;
+            for entry in entries {
+                let attrs = entry.metadata();
+                match kind_of(&attrs) {
+                    Kind::Dir => pending.push(join(&dir, &entry.file_name())),
+                    Kind::File => total += attrs.size.unwrap_or(0),
+                    _ => {}
+                }
+            }
+        }
+        Ok(total)
+    }
+
     async fn remove_file(&self, path: &str) -> Result<(), Failure> {
         self.sftp
             .remove_file(path)
@@ -231,7 +263,7 @@ impl Connection {
     }
 }
 
-fn join(dir: &str, name: &str) -> String {
+pub fn join(dir: &str, name: &str) -> String {
     if dir.ends_with('/') {
         format!("{dir}{name}")
     } else {
@@ -584,7 +616,7 @@ mod local_server_tests {
     }
 
     #[test]
-    fn deletes_files_and_folders_recursively() {
+    fn measures_and_deletes_files_and_folders_recursively() {
         let dir = tempfile::tempdir().unwrap();
         let Some(_) = server(dir.path()) else {
             return;
@@ -604,6 +636,8 @@ mod local_server_tests {
                 .await
                 .unwrap();
             let root = connection.list(None).await.unwrap().path;
+            assert_eq!(connection.size(&join(&root, "keep.txt")).await.unwrap(), 1);
+            assert_eq!(connection.size(&join(&root, "my folder")).await.unwrap(), 3);
             connection.delete(&root, "it's gone.txt").await.unwrap();
             connection.delete(&root, "my folder").await.unwrap();
             assert_eq!(names(&connection.list(None).await.unwrap()), ["keep.txt"]);

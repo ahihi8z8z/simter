@@ -81,6 +81,8 @@ the server (and the reverse for downloads).
 | 4.11 | Through the ProxyJump host, open several folders in a row; on the server watch `ps -ef \| grep sftp-server` | Each folder opens without a new connection delay; one `sftp-server` per tab; it ends when the tab closes | | |
 | 4.12 | Host whose config sets `RemoteCommand byobu` / `RequestTTY yes` | Files list normally; no Byobu session is started by the file pane | | |
 | 4.13 | Browse, then drop the network (or `kill` the tab's `sftp-server`), then Refresh | At most one clear error (a dropped network times out after 30 s); the next Refresh reconnects and lists | | |
+| 4.14 | Upload, then download, a 500 MB file and a folder of many small files | Bar and "N% · x of y" advance steadily to the end; the row then shows Done; browsing stays responsive meanwhile | | |
+| 4.15 | Cancel a large transfer midway; repeat with Overwrite on an existing target | Bar disappears on Cancelled; after Overwrite the bar restarts from 0% | | |
 
 ### 4b. Right-click menu and delete
 
@@ -138,7 +140,7 @@ Use a disposable folder on the server; check the results there with `ls -la`.
 
 ## Deviations from the spec
 
-List anything that does not meet `spec.md`, e.g. transfers show state rather than byte progress.
+List anything that does not meet `spec.md`, e.g. progress that stalls or jumps.
 
 ## Verdict
 

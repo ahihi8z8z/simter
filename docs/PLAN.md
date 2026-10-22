@@ -53,8 +53,11 @@ docs/             design notes, testbed report template
   the tab kills the process.
 - **Host keys:** the terminal handles prompts normally. The file pane uses `BatchMode=yes`,
   so an unknown host fails with guidance to accept the key in the terminal; never auto-accepted.
-- **Progress:** sftp prints no progress meter without a TTY, so the MVP shows
-  running/done/failed (permitted by W2.4). Download progress may be estimated from local size.
+- **Progress:** sftp prints no progress meter without a TTY, so progress is measured from the
+  files: the total from the source (local walk, or a remote walk over the tab's SFTP
+  connection), the bytes done from the copy every 500 ms (the local `.part` copy for
+  downloads, the remote target for uploads). The bar stays indeterminate until the total is
+  known or if the connection cannot measure; the transfer itself never depends on it.
 
 ## Decisions (defaults taken; change if needed)
 

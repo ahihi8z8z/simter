@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { baseName, withConflictCheck, type Choice } from "./transfers";
+import { baseName, describeProgress, withConflictCheck, type Choice } from "./transfers";
 
 const exists = { kind: "exists", message: "“a.txt” already exists in /srv" };
 
@@ -47,5 +47,25 @@ describe("baseName", () => {
     expect(baseName(String.raw`C:\Users\me\máy chủ.txt`)).toBe("máy chủ.txt");
     expect(baseName("D:\\data\\folder\\")).toBe("folder");
     expect(baseName("/srv/my dir/")).toBe("my dir");
+  });
+});
+
+describe("describeProgress", () => {
+  it("shows a percentage once the total is known", () => {
+    expect(describeProgress({ done: 512 * 1024, total: 2048 * 1024 })).toEqual({
+      fraction: 0.25,
+      text: "25% · 512.0 KiB of 2.0 MiB",
+    });
+    expect(describeProgress({ done: 0, total: 10 }).text).toBe("0% · 0 B of 10 B");
+  });
+
+  it("never goes past 100%", () => {
+    expect(describeProgress({ done: 150, total: 100 })).toEqual({ fraction: 1, text: "100% · 100 B of 100 B" });
+  });
+
+  it("shows bytes alone while the total is unknown", () => {
+    expect(describeProgress({ done: 0, total: null })).toEqual({ fraction: null, text: "Running…" });
+    expect(describeProgress({ done: 2048, total: null })).toEqual({ fraction: null, text: "2.0 KiB" });
+    expect(describeProgress({ done: 0, total: 0 }).fraction).toBeNull();
   });
 });

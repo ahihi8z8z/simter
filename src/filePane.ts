@@ -1,9 +1,18 @@
 import { open } from "@tauri-apps/plugin-dialog";
-import { cancelTransfer, deleteRemote, downloadEntry, listRemote, uploadPath, type Entry, type SftpError } from "./api";
+import {
+  cancelTransfer,
+  deleteRemote,
+  downloadEntry,
+  listRemote,
+  uploadPath,
+  type Entry,
+  type Progress,
+  type SftpError,
+} from "./api";
 import { isMenuOpen, showMenu, type MenuItem } from "./contextMenu";
 import { moveSelection } from "./hostList";
 import { deleteWarning, describeSftpError, formatSize, joinPath, parentPath, sortEntries } from "./remotePath";
-import { baseName, withConflictCheck, type Choice } from "./transfers";
+import { baseName, describeProgress, withConflictCheck, type Choice } from "./transfers";
 
 const icons: Record<Entry["kind"], string> = { dir: "📁", file: "📄", link: "🔗", other: "⚙" };
 
@@ -97,13 +106,14 @@ interface Job {
   arrow: "↑" | "↓";
   name: string;
   title: string;
-  run(id: number, overwrite: boolean): Promise<void>;
+  run(id: number, overwrite: boolean, onProgress: (progress: Progress) => void): Promise<void>;
 }
 
 /** One line in the transfer list. */
 class TransferRow {
   readonly element = document.createElement("li");
   private readonly status = document.createElement("span");
+  private readonly bar = document.createElement("progress");
   private readonly action = document.createElement("button");
 
   constructor(job: Job) {
@@ -116,15 +126,20 @@ class TransferRow {
     name.className = "transfer-name";
     name.textContent = job.name;
     this.status.className = "transfer-status";
+    this.bar.className = "transfer-bar";
+    this.bar.hidden = true;
     this.action.type = "button";
     this.action.className = "transfer-action";
     this.action.hidden = true;
-    this.element.append(arrow, name, this.status, this.action);
+    this.element.append(arrow, name, this.bar, this.status, this.action);
     this.set("waiting", "Waiting");
   }
 
   start(cancel: () => void): void {
     this.set("running", "Running…");
+    // Without a value the bar is indeterminate until the total is known.
+    this.bar.removeAttribute("value");
+    this.bar.hidden = false;
     this.action.hidden = false;
     this.action.textContent = "Cancel";
     this.action.title = "Stop this transfer";
@@ -134,8 +149,18 @@ class TransferRow {
     };
   }
 
+  /** Shows the latest measurement. */
+  progress(progress: Progress): void {
+    const { fraction, text } = describeProgress(progress);
+    if (fraction === null) this.bar.removeAttribute("value");
+    else this.bar.value = fraction;
+    this.status.textContent = text;
+    this.status.title = text;
+  }
+
   finish(state: "done" | "skipped" | "cancelled" | "failed", text: string, detail = text): void {
     this.set(state, text);
+    this.bar.hidden = true;
     this.status.title = detail;
     this.action.hidden = false;
     this.action.disabled = false;
@@ -290,7 +315,8 @@ export class FilePane {
         arrow: "↑",
         name: baseName(local),
         title: `${local} → ${remoteDir}`,
-        run: (id, overwrite) => uploadPath(id, this.session, this.alias, local, remoteDir, overwrite, this.configPath),
+        run: (id, overwrite, onProgress) =>
+          uploadPath(id, this.session, this.alias, local, remoteDir, overwrite, onProgress, this.configPath),
       }),
     );
     if ((await this.runJobs(jobs)) && this.path === remoteDir) void this.load(remoteDir);
@@ -361,7 +387,8 @@ export class FilePane {
         arrow: "↓",
         name: entry.name,
         title: `${joinPath(remoteDir, entry.name)} → ${localDir}`,
-        run: (id, overwrite) => downloadEntry(id, this.session, this.alias, remoteDir, entry.name, localDir, overwrite, this.configPath),
+        run: (id, overwrite, onProgress) =>
+          downloadEntry(id, this.session, this.alias, remoteDir, entry.name, localDir, overwrite, onProgress, this.configPath),
       },
     ]);
   }
@@ -382,7 +409,10 @@ export class FilePane {
       const id = nextTransferId++;
       row.start(() => void cancelTransfer(id));
       try {
-        const outcome = await withConflictCheck((overwrite) => job.run(id, overwrite), askConflict);
+        const outcome = await withConflictCheck(
+          (overwrite) => job.run(id, overwrite, (progress) => row.progress(progress)),
+          askConflict,
+        );
         if (outcome === "done") {
           anyDone = true;
           row.finish("done", "Done");

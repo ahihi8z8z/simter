@@ -1,6 +1,7 @@
 // Transfer bookkeeping for the file pane, kept free of DOM and Tauri for unit tests.
 
-import type { SftpError } from "./api";
+import type { Progress, SftpError } from "./api";
+import { formatSize } from "./remotePath";
 
 export type Choice = "overwrite" | "skip" | "cancel";
 export type Outcome = "done" | "skipped" | "cancelled";
@@ -28,6 +29,19 @@ export async function withConflictCheck(
     await attempt(true);
     return "done";
   }
+}
+
+/**
+ * What a transfer row shows: the bar's fraction (null for an unknown total) and its text. The
+ * fraction is capped, since merging into an existing folder counts files already there.
+ */
+export function describeProgress({ done, total }: Progress): { fraction: number | null; text: string } {
+  if (total === null || total === 0) {
+    return { fraction: null, text: done > 0 ? formatSize(done) : "Running…" };
+  }
+  const shown = Math.min(done, total);
+  const fraction = shown / total;
+  return { fraction, text: `${Math.floor(fraction * 100)}% · ${formatSize(shown)} of ${formatSize(total)}` };
 }
 
 /** The last component of a Windows or remote path. */

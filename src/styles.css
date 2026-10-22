@@ -594,6 +594,13 @@ button:disabled {
   white-space: pre;
 }
 
+.transfer-bar {
+  flex: 0 1 30%;
+  min-width: 40px;
+  height: 8px;
+  accent-color: var(--accent);
+}
+
 .transfer-status {
   flex-shrink: 1;
   min-width: 0;

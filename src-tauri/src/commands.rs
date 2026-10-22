@@ -1,7 +1,9 @@
 //! Tauri commands exposed to the frontend. Blocking work runs off the UI thread.
 
+use std::future::Future;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::time::Duration;
 
 use serde::Serialize;
 use tauri::ipc::{Channel, InvokeResponseBody};
@@ -217,6 +219,68 @@ pub fn sftp_close(connections: State<'_, Connections>, session: String) {
     connections.close(&session);
 }
 
+/// How often a running transfer reports its progress.
+const PROGRESS_INTERVAL: Duration = Duration::from_millis(500);
+
+/// Bytes of a transfer written so far, and the total once it is known. sftp
+/// prints no progress without a terminal, so both are measured from the
+/// files themselves.
+#[derive(Clone, Serialize)]
+pub struct Progress {
+    done: u64,
+    total: Option<u64>,
+}
+
+/// Awaits `work`, measuring `total` alongside and sending `measure`d
+/// progress every [`PROGRESS_INTERVAL`]. Either may give `None` when it
+/// cannot tell; the transfer goes on regardless.
+async fn with_progress<T, M: Future<Output = Option<u64>>>(
+    work: impl Future<Output = T>,
+    total: impl Future<Output = Option<u64>>,
+    mut measure: impl FnMut() -> M,
+    progress: &Channel<Progress>,
+) -> T {
+    tokio::pin!(work, total);
+    let mut known = Progress {
+        done: 0,
+        total: None,
+    };
+    let mut measuring_total = true;
+    loop {
+        tokio::select! {
+            result = &mut work => return result,
+            total = &mut total, if measuring_total => {
+                measuring_total = false;
+                known.total = total;
+            }
+            done = async {
+                tokio::time::sleep(PROGRESS_INTERVAL).await;
+                measure().await
+            } => match done {
+                Some(done) => known.done = done,
+                None => continue,
+            },
+        }
+        // Fails only once the frontend dropped the channel.
+        let _ = progress.send(known.clone());
+    }
+}
+
+/// The tab's SFTP connection for measuring progress, if it can be had;
+/// progress is only an estimate, so a failure here does not stop a transfer.
+async fn measuring_connection(
+    app: &AppHandle,
+    session: &str,
+    alias: &str,
+    config_path: Option<&Path>,
+) -> Option<Arc<Connection>> {
+    let broker = app.state::<Arc<Broker>>();
+    let connections = app.state::<Connections>();
+    sftp_connection(&broker, &connections, session, alias, config_path)
+        .await
+        .ok()
+}
+
 /// Runs one transfer off the UI thread with a cancel flag registered under
 /// `id`, so [`transfer_cancel`] can stop it.
 async fn run_transfer(
@@ -248,6 +312,7 @@ async fn run_transfer(
 }
 
 /// Uploads the local file or folder `local` into `remote_dir` on `alias`.
+/// Progress is the size of the copy on the server.
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
 pub async fn sftp_upload(
@@ -259,19 +324,35 @@ pub async fn sftp_upload(
     remote_dir: String,
     overwrite: bool,
     config_path: Option<PathBuf>,
+    progress: Channel<Progress>,
 ) -> Result<(), sftp::Error> {
-    run_transfer(
-        app,
+    let connection = measuring_connection(&app, &session, &alias, config_path.as_deref()).await;
+    let target = local
+        .file_name()
+        .and_then(|n| n.to_str())
+        .map(|name| sftp_session::join(&remote_dir, name));
+    let total = {
+        let local = local.clone();
+        async move {
+            tauri::async_runtime::spawn_blocking(move || transfer::local_size(&local))
+                .await
+                .ok()
+        }
+    };
+    let measure = || async { connection.as_ref()?.size(target.as_deref()?).await.ok() };
+    let work = run_transfer(
+        app.clone(),
         id,
-        session,
-        alias,
-        config_path,
+        session.clone(),
+        alias.clone(),
+        config_path.clone(),
         move |connect, cancel| transfer::upload(connect, &local, &remote_dir, overwrite, cancel),
-    )
-    .await
+    );
+    with_progress(work, total, measure, &progress).await
 }
 
 /// Downloads `name` from `remote_dir` on `alias` into `local_dir`.
+/// Progress is the size of the temporary copy written so far.
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
 pub async fn sftp_download(
@@ -284,16 +365,29 @@ pub async fn sftp_download(
     local_dir: PathBuf,
     overwrite: bool,
     config_path: Option<PathBuf>,
+    progress: Channel<Progress>,
 ) -> Result<(), sftp::Error> {
-    run_transfer(
-        app,
+    // The process id keeps temporary names apart from earlier runs.
+    let tag = format!("{}-{id}", std::process::id());
+    let connection = measuring_connection(&app, &session, &alias, config_path.as_deref()).await;
+    let source = sftp_session::join(&remote_dir, &name);
+    let total = async { connection.as_ref()?.size(&source).await.ok() };
+    let temp = local_dir.join(transfer::temp_name(&name, &tag));
+    let measure = || {
+        let temp = temp.clone();
+        async move {
+            tauri::async_runtime::spawn_blocking(move || transfer::local_size(&temp))
+                .await
+                .ok()
+        }
+    };
+    let work = run_transfer(
+        app.clone(),
         id,
-        session,
-        alias,
-        config_path,
+        session.clone(),
+        alias.clone(),
+        config_path.clone(),
         move |connect, cancel| {
-            // The process id keeps temporary names apart from earlier runs.
-            let tag = format!("{}-{id}", std::process::id());
             transfer::download(
                 connect,
                 &remote_dir,
@@ -304,8 +398,8 @@ pub async fn sftp_download(
                 cancel,
             )
         },
-    )
-    .await
+    );
+    with_progress(work, total, measure, &progress).await
 }
 
 #[tauri::command]
@@ -401,5 +495,51 @@ pub fn terminal_close(terminals: State<'_, Terminals>, id: u32) {
     // Not found means it already exited.
     if let Ok(session) = terminals.get(id) {
         session.kill();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Mutex;
+
+    #[test]
+    fn reports_progress_until_the_transfer_ends() {
+        let sent = Arc::new(Mutex::new(Vec::new()));
+        let log = sent.clone();
+        let channel = Channel::new(move |body| {
+            let InvokeResponseBody::Json(json) = body else {
+                panic!("progress is JSON");
+            };
+            log.lock().unwrap().push(json);
+            Ok(())
+        });
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let mut done = 0;
+        let result = rt.block_on(with_progress(
+            async {
+                tokio::time::sleep(PROGRESS_INTERVAL * 3 + PROGRESS_INTERVAL / 2).await;
+                "finished"
+            },
+            async { Some(300) },
+            || {
+                done += 100;
+                async move { Some(done) }
+            },
+            &channel,
+        ));
+        assert_eq!(result, "finished");
+        assert_eq!(
+            *sent.lock().unwrap(),
+            [
+                r#"{"done":0,"total":300}"#,
+                r#"{"done":100,"total":300}"#,
+                r#"{"done":200,"total":300}"#,
+                r#"{"done":300,"total":300}"#,
+            ]
+        );
     }
 }

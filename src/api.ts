@@ -173,6 +173,15 @@ export function closeRemote(session: string): Promise<void> {
 }
 
 /**
+ * Mirrors commands.rs `Progress`: bytes written so far, estimated from the size of the copy, and
+ * the total once measured (null until then, or if it cannot be).
+ */
+export interface Progress {
+  done: number;
+  total: number | null;
+}
+
+/**
  * Uploads the local file or folder `local` into `remoteDir`. Rejects with an
  * SftpError of kind "exists" if the target exists and `overwrite` is false.
  */
@@ -183,9 +192,11 @@ export function uploadPath(
   local: string,
   remoteDir: string,
   overwrite: boolean,
+  onProgress: (progress: Progress) => void,
   configPath?: string,
 ): Promise<void> {
-  return invoke("sftp_upload", { id, session, alias, local, remoteDir, overwrite, configPath: configPath ?? null });
+  const progress = new Channel<Progress>(onProgress);
+  return invoke("sftp_upload", { id, session, alias, local, remoteDir, overwrite, configPath: configPath ?? null, progress });
 }
 
 /** Downloads `name` from `remoteDir` into `localDir`; conflicts as for uploadPath. */
@@ -197,8 +208,10 @@ export function downloadEntry(
   name: string,
   localDir: string,
   overwrite: boolean,
+  onProgress: (progress: Progress) => void,
   configPath?: string,
 ): Promise<void> {
+  const progress = new Channel<Progress>(onProgress);
   return invoke("sftp_download", {
     id,
     session,
@@ -208,6 +221,7 @@ export function downloadEntry(
     localDir,
     overwrite,
     configPath: configPath ?? null,
+    progress,
   });
 }
 
