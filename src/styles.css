@@ -576,7 +576,8 @@ button:disabled {
 
 .transfer {
   display: flex;
-  gap: 6px;
+  flex-wrap: wrap;
+  gap: 2px 6px;
   align-items: center;
   padding: 2px 6px;
   font-size: 12px;
@@ -609,6 +610,14 @@ button:disabled {
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--muted);
+}
+
+/* Percentage, sizes, file count and speed get a line of their own below the bar. */
+.transfer[data-state="running"] .transfer-status {
+  order: 1;
+  flex-basis: 100%;
+  max-width: none;
+  padding-left: 18px;
 }
 
 .transfer[data-state="failed"] .transfer-status {

@@ -172,13 +172,19 @@ export function closeRemote(session: string): Promise<void> {
   return invoke("sftp_close", { session });
 }
 
+/** Mirrors sftp.rs `Size`: bytes, and for a folder the regular files in it (null for a file). */
+export interface Size {
+  bytes: number;
+  files: number | null;
+}
+
 /**
- * Mirrors commands.rs `Progress`: bytes written so far, estimated from the size of the copy, and
- * the total once measured (null until then, or if it cannot be).
+ * Mirrors commands.rs `Progress`: the size of the copy so far, and the total once measured (null
+ * until then, or if it cannot be).
  */
 export interface Progress {
-  done: number;
-  total: number | null;
+  done: Size;
+  total: Size | null;
 }
 
 /**

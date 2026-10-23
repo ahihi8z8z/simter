@@ -14,7 +14,7 @@ use crate::editor;
 use crate::hosts::{self, Host, Issue};
 use crate::prefs::{self, Layout, Prefs};
 use crate::resolve::{self, Details};
-use crate::sftp::{self, Listing};
+use crate::sftp::{self, Listing, Size};
 use crate::sftp_session::{self, Connection, Connections, Failure};
 use crate::ssh_bin;
 use crate::terminal::{self, PtySession, Terminals};
@@ -222,27 +222,27 @@ pub fn sftp_close(connections: State<'_, Connections>, session: String) {
 /// How often a running transfer reports its progress.
 const PROGRESS_INTERVAL: Duration = Duration::from_millis(500);
 
-/// Bytes of a transfer written so far, and the total once it is known. sftp
+/// Size of a transfer's copy so far, and the total once it is known. sftp
 /// prints no progress without a terminal, so both are measured from the
 /// files themselves.
 #[derive(Clone, Serialize)]
 pub struct Progress {
-    done: u64,
-    total: Option<u64>,
+    done: Size,
+    total: Option<Size>,
 }
 
 /// Awaits `work`, measuring `total` alongside and sending `measure`d
 /// progress every [`PROGRESS_INTERVAL`]. Either may give `None` when it
 /// cannot tell; the transfer goes on regardless.
-async fn with_progress<T, M: Future<Output = Option<u64>>>(
+async fn with_progress<T, M: Future<Output = Option<Size>>>(
     work: impl Future<Output = T>,
-    total: impl Future<Output = Option<u64>>,
+    total: impl Future<Output = Option<Size>>,
     mut measure: impl FnMut() -> M,
     progress: &Channel<Progress>,
 ) -> T {
     tokio::pin!(work, total);
     let mut known = Progress {
-        done: 0,
+        done: Size::default(),
         total: None,
     };
     let mut measuring_total = true;
@@ -524,21 +524,32 @@ mod tests {
                 tokio::time::sleep(PROGRESS_INTERVAL * 3 + PROGRESS_INTERVAL / 2).await;
                 "finished"
             },
-            async { Some(300) },
+            async {
+                Some(Size {
+                    bytes: 300,
+                    files: Some(3),
+                })
+            },
             || {
-                done += 100;
-                async move { Some(done) }
+                done += 1;
+                async move {
+                    Some(Size {
+                        bytes: done * 100,
+                        files: Some(done),
+                    })
+                }
             },
             &channel,
         ));
         assert_eq!(result, "finished");
+        let total = r#""total":{"bytes":300,"files":3}"#;
         assert_eq!(
             *sent.lock().unwrap(),
             [
-                r#"{"done":0,"total":300}"#,
-                r#"{"done":100,"total":300}"#,
-                r#"{"done":200,"total":300}"#,
-                r#"{"done":300,"total":300}"#,
+                format!(r#"{{"done":{{"bytes":0,"files":null}},{total}}}"#),
+                format!(r#"{{"done":{{"bytes":100,"files":1}},{total}}}"#),
+                format!(r#"{{"done":{{"bytes":200,"files":2}},{total}}}"#),
+                format!(r#"{{"done":{{"bytes":300,"files":3}},{total}}}"#),
             ]
         );
     }

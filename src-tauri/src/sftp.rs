@@ -30,6 +30,14 @@ pub struct Entry {
     pub modified: String,
 }
 
+/// How much a transfer moves: bytes, and for a folder the regular files in
+/// it (`None` for a single file).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+pub struct Size {
+    pub bytes: u64,
+    pub files: Option<u64>,
+}
+
 #[derive(Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Listing {

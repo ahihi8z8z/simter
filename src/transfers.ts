@@ -32,16 +32,47 @@ export async function withConflictCheck(
 }
 
 /**
- * What a transfer row shows: the bar's fraction (null for an unknown total) and its text. The
- * fraction is capped, since merging into an existing folder counts files already there.
+ * What a transfer row shows: the bar's fraction (null for an unknown total) and its text, with
+ * the current `speed` in bytes per second when known. Counts are capped, since merging into an
+ * existing folder counts files already there.
  */
-export function describeProgress({ done, total }: Progress): { fraction: number | null; text: string } {
-  if (total === null || total === 0) {
-    return { fraction: null, text: done > 0 ? formatSize(done) : "Running…" };
+export function describeProgress(
+  { done, total }: Progress,
+  speed: number | null = null,
+): { fraction: number | null; text: string } {
+  const rate = speed === null ? [] : [`${formatSize(Math.round(speed))}/s`];
+  if (total === null || total.bytes === 0) {
+    if (done.bytes === 0 && rate.length === 0) return { fraction: null, text: "Running…" };
+    return { fraction: null, text: [formatSize(done.bytes), ...rate].join(" · ") };
   }
-  const shown = Math.min(done, total);
-  const fraction = shown / total;
-  return { fraction, text: `${Math.floor(fraction * 100)}% · ${formatSize(shown)} of ${formatSize(total)}` };
+  const shown = Math.min(done.bytes, total.bytes);
+  const fraction = shown / total.bytes;
+  const parts = [`${Math.floor(fraction * 100)}%`, `${formatSize(shown)} of ${formatSize(total.bytes)}`];
+  if (total.files !== null) {
+    // Files are copied one at a time, so the last one present is still being written.
+    const present = done.files ?? 0;
+    const finished = shown === total.bytes ? present : Math.max(present - 1, 0);
+    parts.push(`${Math.min(finished, total.files)}/${total.files} files`);
+  }
+  return { fraction, text: [...parts, ...rate].join(" · ") };
+}
+
+/** Transfer rate in bytes per second, averaged over the last few seconds of measurements. */
+export class SpeedMeter {
+  private samples: { at: number; bytes: number }[] = [];
+
+  constructor(private readonly windowMs = 3000) {}
+
+  /** Adds a measurement of `bytes` done at `at` ms; null until two measurements are apart. */
+  sample(bytes: number, at: number): number | null {
+    const last = this.samples.at(-1);
+    // Less than before: the copy restarted, e.g. after choosing Overwrite.
+    if (last !== undefined && bytes < last.bytes) this.samples = [];
+    this.samples.push({ at, bytes });
+    while (this.samples.length > 2 && at - this.samples[1].at >= this.windowMs) this.samples.shift();
+    const first = this.samples[0];
+    return at > first.at ? ((bytes - first.bytes) * 1000) / (at - first.at) : null;
+  }
 }
 
 /** The last component of a Windows or remote path. */

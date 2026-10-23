@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { baseName, describeProgress, withConflictCheck, type Choice } from "./transfers";
+import { baseName, describeProgress, SpeedMeter, withConflictCheck, type Choice } from "./transfers";
 
 const exists = { kind: "exists", message: "“a.txt” already exists in /srv" };
 
@@ -51,21 +51,59 @@ describe("baseName", () => {
 });
 
 describe("describeProgress", () => {
-  it("shows a percentage once the total is known", () => {
-    expect(describeProgress({ done: 512 * 1024, total: 2048 * 1024 })).toEqual({
+  const file = (bytes: number) => ({ bytes, files: null });
+  const folder = (bytes: number, files: number | null) => ({ bytes, files });
+
+  it("shows a file's percentage, size and speed", () => {
+    expect(describeProgress({ done: file(512 * 1024), total: file(2048 * 1024) }, 1.5 * 1024 * 1024)).toEqual({
       fraction: 0.25,
-      text: "25% · 512.0 KiB of 2.0 MiB",
+      text: "25% · 512.0 KiB of 2.0 MiB · 1.5 MiB/s",
     });
-    expect(describeProgress({ done: 0, total: 10 }).text).toBe("0% · 0 B of 10 B");
+    expect(describeProgress({ done: file(0), total: file(10) }).text).toBe("0% · 0 B of 10 B");
+  });
+
+  it("counts a folder's files, not the one still being written", () => {
+    const total = folder(1000, 10);
+    expect(describeProgress({ done: folder(0, null), total }).text).toBe("0% · 0 B of 1000 B · 0/10 files");
+    expect(describeProgress({ done: folder(450, 4), total }, 100).text).toBe(
+      "45% · 450 B of 1000 B · 3/10 files · 100 B/s",
+    );
+    expect(describeProgress({ done: folder(1000, 10), total }).text).toBe("100% · 1000 B of 1000 B · 10/10 files");
   });
 
   it("never goes past 100%", () => {
-    expect(describeProgress({ done: 150, total: 100 })).toEqual({ fraction: 1, text: "100% · 100 B of 100 B" });
+    expect(describeProgress({ done: folder(150, 7), total: folder(100, 5) })).toEqual({
+      fraction: 1,
+      text: "100% · 100 B of 100 B · 5/5 files",
+    });
   });
 
-  it("shows bytes alone while the total is unknown", () => {
-    expect(describeProgress({ done: 0, total: null })).toEqual({ fraction: null, text: "Running…" });
-    expect(describeProgress({ done: 2048, total: null })).toEqual({ fraction: null, text: "2.0 KiB" });
-    expect(describeProgress({ done: 0, total: 0 }).fraction).toBeNull();
+  it("shows bytes and speed alone while the total is unknown", () => {
+    expect(describeProgress({ done: file(0), total: null })).toEqual({ fraction: null, text: "Running…" });
+    expect(describeProgress({ done: file(2048), total: null }, 1024)).toEqual({
+      fraction: null,
+      text: "2.0 KiB · 1.0 KiB/s",
+    });
+    expect(describeProgress({ done: folder(0, 0), total: folder(0, 0) }).fraction).toBeNull();
+  });
+});
+
+describe("SpeedMeter", () => {
+  it("averages over the last few seconds", () => {
+    const meter = new SpeedMeter(1000);
+    expect(meter.sample(0, 0)).toBeNull();
+    expect(meter.sample(500, 500)).toBe(1000);
+    expect(meter.sample(1000, 1000)).toBe(1000);
+    // Slower now: the first sample has left the window.
+    expect(meter.sample(1100, 1500)).toBe(600);
+    expect(meter.sample(1200, 2000)).toBe(200);
+  });
+
+  it("starts over when the copy restarts", () => {
+    const meter = new SpeedMeter(1000);
+    meter.sample(0, 0);
+    meter.sample(5000, 500);
+    expect(meter.sample(0, 1000)).toBeNull();
+    expect(meter.sample(300, 1500)).toBe(600);
   });
 });

@@ -12,7 +12,7 @@ import {
 import { isMenuOpen, showMenu, type MenuItem } from "./contextMenu";
 import { moveSelection } from "./hostList";
 import { deleteWarning, describeSftpError, formatSize, joinPath, parentPath, sortEntries } from "./remotePath";
-import { baseName, describeProgress, withConflictCheck, type Choice } from "./transfers";
+import { baseName, describeProgress, SpeedMeter, withConflictCheck, type Choice } from "./transfers";
 
 const icons: Record<Entry["kind"], string> = { dir: "📁", file: "📄", link: "🔗", other: "⚙" };
 
@@ -115,6 +115,7 @@ class TransferRow {
   private readonly status = document.createElement("span");
   private readonly bar = document.createElement("progress");
   private readonly action = document.createElement("button");
+  private readonly speed = new SpeedMeter();
 
   constructor(job: Job) {
     this.element.className = "transfer";
@@ -151,7 +152,8 @@ class TransferRow {
 
   /** Shows the latest measurement. */
   progress(progress: Progress): void {
-    const { fraction, text } = describeProgress(progress);
+    const speed = this.speed.sample(progress.done.bytes, performance.now());
+    const { fraction, text } = describeProgress(progress, speed);
     if (fraction === null) this.bar.removeAttribute("value");
     else this.bar.value = fraction;
     this.status.textContent = text;

@@ -19,7 +19,7 @@ use russh_sftp::protocol::{FileAttributes, StatusCode};
 use tokio::io::AsyncReadExt;
 use tokio::process::{Child, Command};
 
-use crate::sftp::{classify, Entry, Error, ErrorKind, Kind, Listing};
+use crate::sftp::{classify, Entry, Error, ErrorKind, Kind, Listing, Size};
 
 /// Limit for connecting and logging in, not counting time spent in prompts.
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
@@ -223,19 +223,22 @@ impl Connection {
         Ok(())
     }
 
-    /// Bytes in `path`: a file's size, or the total of the regular files in
-    /// a folder and its sub-folders. `path` itself is followed if it is a
-    /// link, as `get` does; links inside are not counted.
-    pub async fn size(&self, path: &str) -> Result<u64, Failure> {
+    /// Size of `path`: a file's bytes, or the bytes and number of the
+    /// regular files in a folder and its sub-folders. `path` itself is
+    /// followed if it is a link, as `get` does; links inside are not counted.
+    pub async fn size(&self, path: &str) -> Result<Size, Failure> {
         let attrs = self
             .sftp
             .metadata(path)
             .await
             .map_err(|e| failure(path, e))?;
         if kind_of(&attrs) != Kind::Dir {
-            return Ok(attrs.size.unwrap_or(0));
+            return Ok(Size {
+                bytes: attrs.size.unwrap_or(0),
+                files: None,
+            });
         }
-        let mut total = 0;
+        let (mut bytes, mut files) = (0, 0);
         let mut pending = vec![path.to_string()];
         while let Some(dir) = pending.pop() {
             let entries = self
@@ -247,12 +250,18 @@ impl Connection {
                 let attrs = entry.metadata();
                 match kind_of(&attrs) {
                     Kind::Dir => pending.push(join(&dir, &entry.file_name())),
-                    Kind::File => total += attrs.size.unwrap_or(0),
+                    Kind::File => {
+                        bytes += attrs.size.unwrap_or(0);
+                        files += 1;
+                    }
                     _ => {}
                 }
             }
         }
-        Ok(total)
+        Ok(Size {
+            bytes,
+            files: Some(files),
+        })
     }
 
     async fn remove_file(&self, path: &str) -> Result<(), Failure> {
@@ -636,8 +645,20 @@ mod local_server_tests {
                 .await
                 .unwrap();
             let root = connection.list(None).await.unwrap().path;
-            assert_eq!(connection.size(&join(&root, "keep.txt")).await.unwrap(), 1);
-            assert_eq!(connection.size(&join(&root, "my folder")).await.unwrap(), 3);
+            assert_eq!(
+                connection.size(&join(&root, "keep.txt")).await.unwrap(),
+                Size {
+                    bytes: 1,
+                    files: None
+                }
+            );
+            assert_eq!(
+                connection.size(&join(&root, "my folder")).await.unwrap(),
+                Size {
+                    bytes: 3,
+                    files: Some(3)
+                }
+            );
             connection.delete(&root, "it's gone.txt").await.unwrap();
             connection.delete(&root, "my folder").await.unwrap();
             assert_eq!(names(&connection.list(None).await.unwrap()), ["keep.txt"]);

@@ -11,7 +11,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use crate::sftp::{self, quote, Connect, Error, ErrorKind};
+use crate::sftp::{self, quote, Connect, Error, ErrorKind, Size};
 
 /// Limit for the destination check listing; transfers themselves have none.
 const CHECK_TIMEOUT: Duration = Duration::from_secs(30);
@@ -137,15 +137,35 @@ pub fn temp_name(name: &str, tag: &str) -> String {
     format!(".{name}.{tag}.part")
 }
 
-/// Bytes in the local file or folder `path`, for progress. Links are not
+/// Size of the local file or folder `path`, for progress. Links are not
 /// followed; anything missing or unreadable counts as nothing.
-pub fn local_size(path: &Path) -> u64 {
+pub fn local_size(path: &Path) -> Size {
     match fs::symlink_metadata(path) {
-        Ok(meta) if meta.is_dir() => fs::read_dir(path)
-            .map(|entries| entries.flatten().map(|e| local_size(&e.path())).sum())
-            .unwrap_or(0),
-        Ok(meta) if meta.is_file() => meta.len(),
-        _ => 0,
+        Ok(meta) if meta.is_dir() => {
+            let mut size = Size {
+                bytes: 0,
+                files: Some(0),
+            };
+            let mut pending = vec![path.to_path_buf()];
+            while let Some(dir) = pending.pop() {
+                for entry in fs::read_dir(&dir).into_iter().flatten().flatten() {
+                    match entry.metadata() {
+                        Ok(meta) if meta.is_dir() => pending.push(entry.path()),
+                        Ok(meta) if meta.is_file() => {
+                            size.bytes += meta.len();
+                            size.files = size.files.map(|n| n + 1);
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            size
+        }
+        Ok(meta) if meta.is_file() => Size {
+            bytes: meta.len(),
+            files: None,
+        },
+        _ => Size::default(),
     }
 }
 
@@ -329,9 +349,12 @@ mod tests {
         fs::create_dir_all(tree.join("sub dir")).unwrap();
         fs::write(tree.join("a.bin"), [0u8; 1000]).unwrap();
         fs::write(tree.join("sub dir").join("b"), "12345").unwrap();
-        assert_eq!(local_size(&tree.join("a.bin")), 1000);
-        assert_eq!(local_size(&tree), 1005);
-        assert_eq!(local_size(&dir.path().join("missing")), 0);
+        fs::create_dir(tree.join("empty")).unwrap();
+        let size = |bytes, files| Size { bytes, files };
+        assert_eq!(local_size(&tree.join("a.bin")), size(1000, None));
+        assert_eq!(local_size(&tree), size(1005, Some(2)));
+        assert_eq!(local_size(&tree.join("empty")), size(0, Some(0)));
+        assert_eq!(local_size(&dir.path().join("missing")), size(0, None));
     }
 
     #[test]

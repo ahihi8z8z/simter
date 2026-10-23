@@ -55,9 +55,11 @@ docs/             design notes, testbed report template
   so an unknown host fails with guidance to accept the key in the terminal; never auto-accepted.
 - **Progress:** sftp prints no progress meter without a TTY, so progress is measured from the
   files: the total from the source (local walk, or a remote walk over the tab's SFTP
-  connection), the bytes done from the copy every 500 ms (the local `.part` copy for
-  downloads, the remote target for uploads). The bar stays indeterminate until the total is
-  known or if the connection cannot measure; the transfer itself never depends on it.
+  connection), the bytes and files done from the copy every 500 ms (the local `.part` copy for
+  downloads, the remote target for uploads). Files are copied one at a time, so the last file
+  present counts as unfinished until all bytes are there. The speed is averaged in the UI over
+  the last 3 s of measurements. The bar stays indeterminate until the total is known or if the
+  connection cannot measure; the transfer itself never depends on it.
 
 ## Decisions (defaults taken; change if needed)
 
