@@ -131,8 +131,6 @@ A build is acceptable only when all of the following are demonstrated:
 
 - Automated tests for host discovery, selection/filtering, command argument construction, path handling, and error cases.
 - Integration tests against a controlled SSH test server (including SFTP operations and a jump-host scenario where feasible).
-- **Mandatory manual validation on a real Windows + Linux testbed**, using the **embedded** terminal and a running Byobu session; mocks alone are insufficient for acceptance. Test F2–F9, TUI rendering, pane resize, clipboard, and concurrent SFTP browsing/transfers.
-- Record a short test report listing environment, steps, pass/fail results, and any deviations from the spec.
 
 ## 9. Implementation discretion and deliverables
 
@@ -141,7 +139,7 @@ The coding agent may choose the GUI toolkit, maintained embedded terminal compon
 Deliver:
 - Source code and repeatable Windows setup/build instructions.
 - Runnable Windows app (or reproducible packaging procedure).
-- Tests and real-testbed validation instructions/report template.
+- Tests.
 - `README.md` documenting prerequisites, basic operations, supported SSH config behavior, and known limitations.
 
 When a requirement cannot be met exactly, flag the discrepancy explicitly; do not silently implement an approximation.

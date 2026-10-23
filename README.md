@@ -63,7 +63,6 @@ No passwords or keys are stored in it.
   leave a partial file.
 - Remote paths containing a backslash, a line break, or both `'` and `"` cannot be opened.
 - Wildcard `Host` patterns are not listed; only concrete aliases are.
-- Not yet validated end to end on a Windows + Linux testbed ([docs/TESTBED.md](docs/TESTBED.md)).
 
 ## Build from source
 

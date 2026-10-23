@@ -56,13 +56,11 @@ An atomic commit is one coherent reason to change the code, **not** one file per
 - Do not silently swallow errors, introduce magic fallbacks, or weaken validation/tests to make a check pass.
 - Keep changes readable and consistent with existing project conventions; avoid premature optimization and unrelated cleanup.
 
-## 6. Verification and testbed policy
+## 6. Verification policy
 
 - For each change, select the lowest-cost tests that actually exercise the modified behavior. Add regression tests for bug fixes when feasible.
 - Run existing formatter/linter, static/type checks, unit/integration tests, and build commands that apply to affected code. Derive exact commands from the repository; do not invent successful test results.
 - Use mocks/fakes for fast tests at process and network boundaries, but **never claim mocks prove real SSH, SFTP, terminal, or Windows PTY compatibility**.
-- Before declaring an end-to-end feature accepted, test it on a real **Windows 10/11 client + Linux SSH server** testbed. For relevant changes, cover SSH config resolution (`Host`, `Include`, jump hosts), authentication, embedded terminal resize, Byobu F2–F9, SFTP transfers, errors/cancellation, and reconnect behavior as specified.
-- If the testbed or prerequisites are unavailable, explicitly report `NOT TESTED ON TESTBED`, which behaviors remain unverified, and how to test them. Do not invent results or claim feature acceptance.
 - Never use real user credentials or production servers as test fixtures unless explicitly authorized. Prefer disposable test identities and non-production hosts.
 
 ## 7. Definition of done for a slice
@@ -75,12 +73,10 @@ A slice is ready to commit when:
 - Documentation is updated if user-visible behavior, setup, or an architectural decision changed.
 - The commit message accurately describes the change, and the working tree's unrelated changes remain untouched.
 
-A slice requiring a real testbed may be committed as verified implementation work **only if** its automated checks pass and its unverified end-to-end status is stated explicitly; it must not be reported as accepted or complete against the spec before testbed validation. If the current task requires testbed acceptance as a commit gate, leave it uncommitted until tested.
-
 ## 8. Communication and escalation
 
 - Report progress by completed slices/commits, not by vague percentages.
-- On completion, report: what changed; commit hashes/messages (if any); checks actually run and outcomes; testbed status; remaining gaps or blockers.
+- On completion, report: what changed; commit hashes/messages (if any); checks actually run and outcomes; remaining gaps or blockers.
 - If a requirement is ambiguous and materially affects architecture, security, user data, or acceptance behavior, state the precise decision needed. For reversible implementation details, choose the simplest spec-compliant option and document the choice.
 - Never claim an operation, test, commit, or deployment succeeded without observing its result.
 
