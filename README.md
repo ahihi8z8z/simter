@@ -30,8 +30,11 @@ Simter reads `%USERPROFILE%\.ssh\config` and never writes to it. Add hosts there
 - **Open config** opens the SSH config at that host's line in VS Code (or Notepad); press
   **Refresh** after saving. Click the config path at the bottom to use another config file.
 - **Tabs**: one per host. The dot shows amber connecting, green connected, grey ended, red
-  failed. **Reconnect** runs `ssh` again in the same tab. Closing a tab ends only that ssh
-  process; Byobu/tmux sessions keep running on the host.
+  failed. Closing a tab ends only that ssh process; Byobu/tmux sessions keep running on the
+  host.
+- **Reconnect** (right-click the terminal or its tab, or the button shown once ssh has ended)
+  ends the tab's ssh and SFTP connections, even ones that still look alive after the PC slept,
+  and opens new ones in the same tab. Attach to Byobu/tmux again as usual.
 - **Terminal**: every key, including F1–F12 and Ctrl+B, goes to the remote side. Copy with
   Ctrl+Shift+C (or Ctrl+C while text is selected); paste with Ctrl+V or Ctrl+Shift+V. Text
   selected inside tmux/Byobu is copied too (OSC 52, as in Windows Terminal); the host can
@@ -43,6 +46,10 @@ Simter reads `%USERPROFILE%\.ssh\config` and never writes to it. Add hosts there
   Transfers run one at a time; an existing target asks Overwrite, Skip or Cancel. Delete asks
   first and cannot be undone: a folder goes with everything in it, and a link is deleted
   without touching what it points to.
+- **Right-click menus** show only what applies where you click: hosts (**Connect**, **Open
+  config**, **Refresh**), files (above), the terminal (**Copy**, **Paste**, **Reconnect**) and
+  tabs (**Reconnect**, **Close**). While tmux/Byobu has mouse mode on, a right-click in the
+  terminal goes to tmux; Shift+right-click opens Simter's menu.
 - **Layout**: click a view's header to collapse it, drag the dividers to resize, and use the
   panel button at the far right to hide the side bar. The layout is saved.
 - **Passwords**: password, passphrase and new host-key prompts appear in a dialog, once per tab

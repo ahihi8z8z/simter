@@ -16,6 +16,7 @@ import {
   type Layout,
 } from "./api";
 import { showQuestion } from "./askpassDialog";
+import { showMenu, type MenuItem } from "./contextMenu";
 import {
   chooseConfig,
   configTarget,
@@ -125,6 +126,7 @@ function render(): void {
       item.className = "host";
       if (i === recentCount - 1 && recentCount < visible.length) item.classList.add("recent-last");
       item.ariaSelected = String(i === selected);
+      item.dataset.index = String(i);
       const name = document.createElement("span");
       name.textContent = host.alias;
       item.append(name);
@@ -244,6 +246,30 @@ function activate(tab: Tab): void {
   tab.view.show();
 }
 
+/**
+ * Runs a new ssh in the tab and a new SFTP connection for its files, dropping the old ones even
+ * if they still look alive (as after the PC slept). Byobu/tmux sessions on the host are untouched.
+ */
+function reconnect(tab: Tab): void {
+  activate(tab);
+  void tab.view.reconnect();
+  void tab.files.reconnect();
+}
+
+const reconnectTitle = "End this connection and connect again; Byobu/tmux sessions keep running on the host";
+
+function terminalMenu(tab: Tab): MenuItem[] {
+  return [
+    { label: "Copy", title: "Copy the selected text", disabled: !tab.view.hasSelection, run: () => tab.view.copy() },
+    {
+      label: "Paste",
+      title: "Type the clipboard text into the terminal",
+      run: () => void tab.view.paste().catch((e) => console.error("paste failed", e)),
+    },
+    { label: "Reconnect", title: reconnectTitle, run: () => reconnect(tab) },
+  ];
+}
+
 function closeTab(tab: Tab): void {
   const index = tabs.indexOf(tab);
   if (index < 0) return;
@@ -310,6 +336,20 @@ function createTab(alias: string, configPath: string | undefined): Tab {
   };
   body.append(tab.view.element);
   button.addEventListener("click", () => activate(tab));
+  button.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    showMenu(e.clientX, e.clientY, [
+      { label: "Reconnect", title: reconnectTitle, run: () => reconnect(tab) },
+      { label: "Close", title: close.title, run: () => closeTab(tab) },
+    ]);
+  });
+  body.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    // With tmux mouse mode on, a right-click belongs to tmux while connected; Shift+right-click
+    // (which xterm.js does not report) opens this menu instead.
+    if (tab.view.connected && tab.view.mouseReported && !e.shiftKey) return;
+    showMenu(e.clientX, e.clientY, terminalMenu(tab), tab.view);
+  });
   close.addEventListener("click", (e) => {
     e.stopPropagation();
     closeTab(tab);
@@ -462,11 +502,41 @@ configPathButton.addEventListener("click", async () => {
   saveConfigPathPref(customConfig).catch(prefsError);
   await refresh();
 });
-openConfigButton.addEventListener("click", () => {
+function openSelectedConfig(): void {
   const { file, line } = configTarget(visible[selected], configPath);
   openConfig(file, line).catch((e) => void message(String(e), { title: "Could not open the config", kind: "error" }));
+}
+
+openConfigButton.addEventListener("click", openSelectedConfig);
+hostList.addEventListener("contextmenu", (e) => {
+  e.preventDefault();
+  const item = (e.target as Element).closest<HTMLElement>(".host");
+  const index = item ? Number(item.dataset.index) : -1;
+  const refreshItem: MenuItem = { label: "Refresh", title: "Read the SSH config again", run: () => void refresh() };
+  const noConfig = configPath === "";
+  if (index < 0) {
+    showMenu(e.clientX, e.clientY, [
+      refreshItem,
+      { label: "Open config", title: "Open the SSH config file", disabled: noConfig, run: openSelectedConfig },
+    ]);
+    return;
+  }
+  select(index);
+  showMenu(e.clientX, e.clientY, [
+    { label: "Connect", title: "Open this host in a tab", run: connect },
+    { label: "Open config", title: "Open the SSH config at this host", disabled: noConfig, run: openSelectedConfig },
+    refreshItem,
+  ]);
 });
-reconnectButton.addEventListener("click", () => void active?.view.connect());
+reconnectButton.addEventListener("click", () => {
+  if (active) reconnect(active);
+});
+// The WebView's own menu (Back, Refresh, Save as, Print…) does not apply to this app: each area
+// shows its own menu, and text boxes keep the usual Cut/Copy/Paste one.
+document.addEventListener("contextmenu", (e) => {
+  const target = e.target as Element;
+  if (!target.closest("input, textarea") || target.closest(".xterm")) e.preventDefault();
+});
 issuesToggle.addEventListener("click", () => {
   issuesList.hidden = !issuesList.hidden;
 });

@@ -37,7 +37,8 @@ export class TerminalView {
       fontSize: 14,
       cursorBlink: true,
       scrollback: 5000,
-      rightClickSelectsWord: true,
+      // Right-click opens the app's terminal menu instead.
+      rightClickSelectsWord: false,
     });
     this.term.loadAddon(this.fit);
     this.term.attachCustomKeyEventHandler((e) => this.handleKey(e));
@@ -89,9 +90,10 @@ export class TerminalView {
         },
         this.configPath,
       );
-      if (this.disposed) {
+      if (this.disposed || generation !== this.generation) {
+        // Closed or reconnected while ssh was starting.
         void closeTerminal(id);
-      } else if (generation === this.generation && this.state === "connecting") {
+      } else if (this.state === "connecting") {
         // Not already exited: the exit event can arrive before the id does.
         this.id = id;
         this.setState("connected", `ssh ${this.alias}`);
@@ -103,10 +105,47 @@ export class TerminalView {
     }
   }
 
+  /**
+   * Ends the current ssh process, if any, and runs a new one. Unlike `connect()` this works
+   * while a dead connection still looks alive, e.g. after the PC slept.
+   */
+  async reconnect(): Promise<void> {
+    if (this.disposed) return;
+    this.generation++;
+    if (this.id !== null) void closeTerminal(this.id);
+    this.id = null;
+    this.state = "disconnected";
+    await this.connect();
+  }
+
   /** Re-fits and focuses after the tab becomes visible. */
   show(): void {
     this.fitToElement();
     this.term.focus();
+  }
+
+  focus(): void {
+    this.term.focus();
+  }
+
+  get hasSelection(): boolean {
+    return this.term.hasSelection();
+  }
+
+  /** True while the remote side (e.g. tmux with `mouse on`) receives mouse clicks itself. */
+  get mouseReported(): boolean {
+    return this.term.modes.mouseTrackingMode !== "none";
+  }
+
+  copy(): void {
+    navigator.clipboard.writeText(this.term.getSelection()).catch((err) => console.error("copy failed", err));
+    this.term.clearSelection();
+  }
+
+  /** Types the clipboard text, with bracketed-paste markers when the remote enables them. */
+  async paste(): Promise<void> {
+    const text = await navigator.clipboard.readText();
+    if (text) this.term.paste(text);
   }
 
   /** Ends the ssh process (if any) and removes the terminal. */
@@ -146,8 +185,7 @@ export class TerminalView {
     switch (clipboardAction(e, this.term.hasSelection())) {
       case "copy":
         e.preventDefault();
-        navigator.clipboard.writeText(this.term.getSelection()).catch((err) => console.error("copy failed", err));
-        this.term.clearSelection();
+        this.copy();
         return false;
       case "paste":
         // Let the browser fire its native paste event, which xterm.js turns

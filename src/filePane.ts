@@ -1,6 +1,7 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import {
   cancelTransfer,
+  closeRemote,
   deleteRemote,
   downloadEntry,
   listRemote,
@@ -296,6 +297,12 @@ export class FilePane {
     } finally {
       if (generation === this.generation) this.setBusy(false);
     }
+  }
+
+  /** Replaces the tab's browsing connection, which may be dead after sleep, and lists again. */
+  async reconnect(): Promise<void> {
+    await closeRemote(this.session);
+    await this.load(this.path ?? undefined);
   }
 
   private up(): void {

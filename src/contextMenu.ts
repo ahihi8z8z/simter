@@ -34,7 +34,7 @@ export function isMenuOpen(): boolean {
  * Shows a menu at (x, y), replacing any open one. It closes on a choice, Escape, a click
  * elsewhere, scrolling, resizing or the window losing focus; focus then returns to `returnFocus`.
  */
-export function showMenu(x: number, y: number, items: MenuItem[], returnFocus?: HTMLElement): void {
+export function showMenu(x: number, y: number, items: MenuItem[], returnFocus?: { focus(): void }): void {
   current?.close();
   const menu = document.createElement("div");
   menu.className = "context-menu";

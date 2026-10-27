@@ -49,7 +49,8 @@ docs/             design notes
   passes, including `RemoteCommand=none`) and the russh-sftp crate speaks SFTP over its
   stdin/stdout. OpenSSH still does config, authentication and host keys. A request that
   times out or a dead ssh process drops the connection; the next request reconnects. Closing
-  the tab kills the process.
+  the tab kills the process, and Reconnect drops it at once (with the terminal's ssh) instead
+  of waiting for a timeout after the PC slept.
 - **Host keys:** the terminal handles prompts normally. The file pane uses `BatchMode=yes`,
   so an unknown host fails with guidance to accept the key in the terminal; never auto-accepted.
 - **Progress:** sftp prints no progress meter without a TTY, so progress is measured from the
