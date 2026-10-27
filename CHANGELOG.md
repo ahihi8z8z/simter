@@ -4,7 +4,7 @@ All notable changes to Simter are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.0] - Unreleased
+## [0.2.0] - 2026-10-27
 
 Faster file browsing, file actions in right-click menus, real transfer progress, and a way to
 reconnect after the PC wakes from sleep.
@@ -69,5 +69,5 @@ First release.
   Windows Credential Manager.
 - Resizable, collapsible side bar; the layout is saved.
 
-[0.2.0]: https://github.com/ahihi8z8z/simter/compare/v0.1.0...HEAD
+[0.2.0]: https://github.com/ahihi8z8z/simter/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/ahihi8z8z/simter/releases/tag/v0.1.0

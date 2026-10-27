@@ -1,6 +1,6 @@
 [package]
 name = "simter"
-version = "0.1.0"
+version = "0.2.0"
 description = "Simter (simple terminal): SSH host list, embedded terminal, SFTP file pane"
 edition = "2021"
 
