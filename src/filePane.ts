@@ -179,8 +179,8 @@ class TransferRow {
 
 /**
  * Remote file browser for one host, over the tab's SFTP connection. Right-click (or the
- * context-menu key) offers upload on empty space and download/delete on an item; keys here act
- * only while the pane has focus.
+ * context-menu key) offers download/delete on the selected item and upload anywhere else; keys
+ * here act only while the pane has focus.
  */
 export class FilePane {
   readonly element: HTMLElement;
@@ -223,7 +223,7 @@ export class FilePane {
     this.list.className = "file-list";
     this.list.role = "listbox";
     this.list.tabIndex = 0;
-    this.list.title = "Right-click for upload, download and delete";
+    this.list.title = "Right-click to upload here; click an item first, then right-click it to download or delete";
 
     this.transfers = document.createElement("ul");
     this.transfers.className = "transfers";
@@ -242,10 +242,15 @@ export class FilePane {
         if (!isMenuOpen()) this.openMenuForKeyboard();
         return;
       }
+      // Only the item selected beforehand (left click) gets the item menu; anywhere else is
+      // the folder, so there is always room to upload even when items fill the list.
       const item = (e.target as Element).closest<HTMLElement>(".file");
       const index = item ? Number(item.dataset.index) : -1;
-      if (index >= 0) this.select(index);
-      this.openMenu(index, e.clientX, e.clientY);
+      this.openMenu(index >= 0 && index === this.selected ? index : -1, e.clientX, e.clientY);
+    });
+    // A click on empty space clears the selection; items select themselves.
+    this.list.addEventListener("click", (e) => {
+      if (!(e.target as Element).closest(".file") && this.selected >= 0) this.select(-1);
     });
 
     this.upButton.addEventListener("click", () => this.up());
@@ -272,7 +277,8 @@ export class FilePane {
       this.path = listing.path;
       this.pathInput.value = listing.path;
       this.entries = sortEntries(listing.entries);
-      this.selected = this.entries.length ? 0 : -1;
+      // Nothing selected until clicked, so a right-click means the folder.
+      this.selected = -1;
       this.render();
       const count = `${this.entries.length} ${this.entries.length === 1 ? "item" : "items"}`;
       if (listing.unparsed.length) {
@@ -341,6 +347,7 @@ export class FilePane {
       : [
           { label: "Upload files…", title: "Upload files into this folder", disabled: noFolder, run: () => void this.upload(false) },
           { label: "Upload folder…", title: "Upload a folder into this folder", disabled: noFolder, run: () => void this.upload(true) },
+          { label: "Refresh", title: "List this folder again", run: () => void this.load(this.path ?? undefined) },
         ];
     showMenu(x, y, items, this.list);
   }

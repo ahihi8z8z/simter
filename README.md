@@ -37,11 +37,12 @@ Simter reads `%USERPROFILE%\.ssh\config` and never writes to it. Add hosts there
   selected inside tmux/Byobu is copied too (OSC 52, as in Windows Terminal); the host can
   write the clipboard this way but never read it.
 - **Files** (right side bar): the active tab's host over SFTP. Double-click or Enter opens a
-  folder, Backspace goes up, or type a path. Right-click (or press the context-menu key or
-  Shift+F10): on empty space for **Upload files…** and **Upload folder…**, on an item for
-  **Download…** and **Delete…**. Transfers run one at a time; an existing target asks Overwrite,
-  Skip or Cancel. Delete asks first and cannot be undone: a folder goes with everything in it,
-  and a link is deleted without touching what it points to.
+  folder, Backspace goes up, or type a path. Click an item to select it, then right-click it
+  for **Download…** and **Delete…**; right-click anywhere else in the list for **Upload
+  files…**, **Upload folder…** and **Refresh** (the context-menu key or Shift+F10 work too).
+  Transfers run one at a time; an existing target asks Overwrite, Skip or Cancel. Delete asks
+  first and cannot be undone: a folder goes with everything in it, and a link is deleted
+  without touching what it points to.
 - **Layout**: click a view's header to collapse it, drag the dividers to resize, and use the
   panel button at the far right to hide the side bar. The layout is saved.
 - **Passwords**: password, passphrase and new host-key prompts appear in a dialog, once per tab
