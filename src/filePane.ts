@@ -5,6 +5,7 @@ import {
   deleteRemote,
   downloadEntry,
   listRemote,
+  openRemote,
   uploadPath,
   type Entry,
   type Progress,
@@ -107,6 +108,8 @@ interface Job {
   arrow: "↑" | "↓";
   name: string;
   title: string;
+  /** Shown when it completes; "Done" if omitted. */
+  doneText?: string;
   run(id: number, overwrite: boolean, onProgress: (progress: Progress) => void): Promise<void>;
 }
 
@@ -180,7 +183,7 @@ class TransferRow {
 
 /**
  * Remote file browser for one host, over the tab's SFTP connection. Right-click (or the
- * context-menu key) offers download/delete on the selected item and upload anywhere else; keys
+ * context-menu key) offers open/download/delete on the selected item and upload anywhere else; keys
  * here act only while the pane has focus.
  */
 export class FilePane {
@@ -224,7 +227,7 @@ export class FilePane {
     this.list.className = "file-list";
     this.list.role = "listbox";
     this.list.tabIndex = 0;
-    this.list.title = "Right-click to upload here; click an item first, then right-click it to download or delete";
+    this.list.title = "Right-click to upload here; double-click a file to open a copy; click an item first, then right-click it to open, download or delete";
 
     this.transfers = document.createElement("ul");
     this.transfers.className = "transfers";
@@ -314,6 +317,24 @@ export class FilePane {
     if (!entry || this.path === null) return;
     // A link may point to a folder; if not, sftp reports it.
     if (entry.kind === "dir" || entry.kind === "link") void this.load(joinPath(this.path, entry.name));
+    else if (entry.kind === "file") void this.view(entry);
+  }
+
+  /** Opens a read-only temporary copy of a file with its Windows app. */
+  private async view(entry: Entry): Promise<void> {
+    const remoteDir = this.path;
+    if (remoteDir === null) return;
+    await this.runJobs([
+      {
+        arrow: "↓",
+        name: entry.name,
+        title: `${joinPath(remoteDir, entry.name)} → open a read-only temporary copy`,
+        doneText: "Opened",
+        // A new folder per copy, so there is nothing to overwrite.
+        run: (id, _overwrite, onProgress) =>
+          openRemote(id, this.session, this.alias, remoteDir, entry.name, onProgress, this.configPath),
+      },
+    ]);
   }
 
   private async upload(folder: boolean): Promise<void> {
@@ -343,6 +364,17 @@ export class FilePane {
     const noFolder = this.path === null;
     const items: MenuItem[] = entry
       ? [
+          {
+            label: "Open",
+            title:
+              entry.kind === "file"
+                ? "Open a read-only copy with its Windows app; changes are not uploaded"
+                : entry.kind === "link"
+                  ? "Open the folder it points to"
+                  : "Open this folder",
+            disabled: entry.kind === "other",
+            run: () => this.open(index),
+          },
           {
             label: "Download…",
             title: "Download to a local folder",
@@ -431,7 +463,7 @@ export class FilePane {
         );
         if (outcome === "done") {
           anyDone = true;
-          row.finish("done", "Done");
+          row.finish("done", job.doneText ?? "Done");
         } else if (outcome === "skipped") {
           row.finish("skipped", "Skipped: already exists");
         } else {

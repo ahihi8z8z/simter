@@ -231,6 +231,25 @@ export function downloadEntry(
   });
 }
 
+/**
+ * Downloads the file `name` from `remoteDir` into a new temporary folder and opens the copy,
+ * read-only, with its Windows app; a file that would run opens with an app the user picks.
+ * Changes to the copy are not uploaded. Rejects with an SftpError, of kind "cancelled" also when
+ * no app was picked.
+ */
+export function openRemote(
+  id: number,
+  session: string,
+  alias: string,
+  remoteDir: string,
+  name: string,
+  onProgress: (progress: Progress) => void,
+  configPath?: string,
+): Promise<void> {
+  const progress = new Channel<Progress>(onProgress);
+  return invoke("sftp_open", { id, session, alias, remoteDir, name, configPath: configPath ?? null, progress });
+}
+
 /** Stops a running transfer; it then rejects with kind "cancelled". */
 export function cancelTransfer(id: number): Promise<void> {
   return invoke("transfer_cancel", { id });

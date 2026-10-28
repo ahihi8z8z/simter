@@ -41,8 +41,13 @@ Simter reads `%USERPROFILE%\.ssh\config` and never writes to it. Add hosts there
   write the clipboard this way but never read it.
 - **Files** (right side bar): the active tab's host over SFTP. Double-click or Enter opens a
   folder, Backspace goes up, or type a path. Click an item to select it, then right-click it
-  for **Download…** and **Delete…**; right-click anywhere else in the list for **Upload
+  for **Open**, **Download…** and **Delete…**; right-click anywhere else in the list for **Upload
   files…**, **Upload folder…** and **Refresh** (the context-menu key or Shift+F10 work too).
+  **Open** on a file, or double-click/Enter, downloads a read-only copy into a folder of its own
+  under `%TEMP%\Simter` and opens it with its Windows app. Changes to the copy are never
+  uploaded; use **Download…** to keep a file. A file that Windows would run instead of show
+  (programs, shortcuts, `.bat`/`.cmd`/`.js`/`.vbs`, types in `PATHEXT`, and scripts such as
+  `.sh`, `.py`, `.ps1`, `.jar`) opens with the app you pick in **Open with**, never directly.
   Transfers run one at a time; an existing target asks Overwrite, Skip or Cancel. Delete asks
   first and cannot be undone: a folder goes with everything in it, and a link is deleted
   without touching what it points to.
@@ -69,6 +74,8 @@ No passwords or keys are stored in it.
 - Transfer progress is estimated from the size of the copy written so far, checked twice a
   second; merging into an existing folder counts files already there. A cancelled upload may
   leave a partial file.
+- Copies opened with **Open** stay in `%TEMP%\Simter` until Windows or you clean the temp
+  folder; each Open makes a new copy.
 - Remote paths containing a backslash, a line break, or both `'` and `"` cannot be opened.
 - Wildcard `Host` patterns are not listed; only concrete aliases are.
 

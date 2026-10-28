@@ -3,6 +3,7 @@ mod commands;
 mod credentials;
 mod editor;
 pub mod hosts;
+mod opener;
 mod prefs;
 mod process;
 mod resolve;
@@ -48,6 +49,7 @@ pub fn run() {
             commands::sftp_delete,
             commands::sftp_upload,
             commands::sftp_download,
+            commands::sftp_open,
             commands::transfer_cancel,
             commands::askpass_reply,
             commands::askpass_end,

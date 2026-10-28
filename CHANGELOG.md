@@ -4,6 +4,15 @@ All notable changes to Simter are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Open remote files.** Double-click a file, press Enter, or choose **Open** in its right-click
+  menu to download a read-only copy to a temporary folder and open it with its Windows app.
+  Changes to the copy are not uploaded. Programs and scripts are never run: they open with the
+  app you pick in **Open with**.
+
 ## [0.2.0] - 2026-10-27
 
 Faster file browsing, file actions in right-click menus, real transfer progress, and a way to

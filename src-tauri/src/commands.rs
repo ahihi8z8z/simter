@@ -12,6 +12,7 @@ use tauri::{AppHandle, Manager, State};
 use crate::askpass::Broker;
 use crate::editor;
 use crate::hosts::{self, Host, Issue};
+use crate::opener;
 use crate::prefs::{self, Layout, Prefs};
 use crate::resolve::{self, Details};
 use crate::sftp::{self, Listing, Size};
@@ -367,39 +368,123 @@ pub async fn sftp_download(
     config_path: Option<PathBuf>,
     progress: Channel<Progress>,
 ) -> Result<(), sftp::Error> {
-    // The process id keeps temporary names apart from earlier runs.
-    let tag = format!("{}-{id}", std::process::id());
-    let connection = measuring_connection(&app, &session, &alias, config_path.as_deref()).await;
-    let source = sftp_session::join(&remote_dir, &name);
-    let total = async { connection.as_ref()?.size(&source).await.ok() };
-    let temp = local_dir.join(transfer::temp_name(&name, &tag));
-    let measure = || {
-        let temp = temp.clone();
-        async move {
-            tauri::async_runtime::spawn_blocking(move || transfer::local_size(&temp))
-                .await
-                .ok()
-        }
-    };
-    let work = run_transfer(
-        app.clone(),
+    let download = Download {
         id,
-        session.clone(),
-        alias.clone(),
-        config_path.clone(),
-        move |connect, cancel| {
-            transfer::download(
-                connect,
-                &remote_dir,
-                &name,
-                &local_dir,
-                overwrite,
-                &tag,
-                cancel,
-            )
-        },
-    );
-    with_progress(work, total, measure, &progress).await
+        session,
+        alias,
+        remote_dir,
+        name,
+        config_path,
+    };
+    download.run(app, local_dir, overwrite, progress).await
+}
+
+/// Downloads the file `name` from `remote_dir` on `alias` into a folder of
+/// its own under the temp folder, then opens the copy, read-only, with its
+/// Windows app. Changes to the copy stay on this PC.
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+pub async fn sftp_open(
+    app: AppHandle,
+    id: u32,
+    session: String,
+    alias: String,
+    remote_dir: String,
+    name: String,
+    config_path: Option<PathBuf>,
+    progress: Channel<Progress>,
+) -> Result<(), sftp::Error> {
+    let local_dir = opener::copy_dir(&opener::temp_root(), &transfer_tag(id)).map_err(|e| {
+        sftp::Error::new(
+            sftp::ErrorKind::Local,
+            format!("cannot create a folder for the copy: {e}"),
+        )
+    })?;
+    let file = local_dir.join(&name);
+    let download = Download {
+        id,
+        session,
+        alias,
+        remote_dir,
+        name,
+        config_path,
+    };
+    if let Err(e) = download.run(app, local_dir.clone(), false, progress).await {
+        // Empty once the download removed its partial copy.
+        let _ = std::fs::remove_dir(&local_dir);
+        return Err(e);
+    }
+    tauri::async_runtime::spawn_blocking(move || opener::view(&file))
+        .await
+        .map_err(|e| sftp::Error::new(sftp::ErrorKind::Other, format!("open task failed: {e}")))?
+}
+
+/// Keeps temporary names of transfer `id` apart, also from earlier runs.
+fn transfer_tag(id: u32) -> String {
+    format!("{}-{id}", std::process::id())
+}
+
+/// What to download, for [`sftp_download`] and [`sftp_open`].
+struct Download {
+    id: u32,
+    session: String,
+    alias: String,
+    remote_dir: String,
+    name: String,
+    config_path: Option<PathBuf>,
+}
+
+impl Download {
+    /// Downloads into `local_dir`. Progress is the size of the temporary copy
+    /// written so far.
+    async fn run(
+        self,
+        app: AppHandle,
+        local_dir: PathBuf,
+        overwrite: bool,
+        progress: Channel<Progress>,
+    ) -> Result<(), sftp::Error> {
+        let Download {
+            id,
+            session,
+            alias,
+            remote_dir,
+            name,
+            config_path,
+        } = self;
+        let tag = transfer_tag(id);
+        let connection = measuring_connection(&app, &session, &alias, config_path.as_deref()).await;
+        let source = sftp_session::join(&remote_dir, &name);
+        let total = async { connection.as_ref()?.size(&source).await.ok() };
+        let temp = local_dir.join(transfer::temp_name(&name, &tag));
+        let measure = || {
+            let temp = temp.clone();
+            async move {
+                tauri::async_runtime::spawn_blocking(move || transfer::local_size(&temp))
+                    .await
+                    .ok()
+            }
+        };
+        let work = run_transfer(
+            app.clone(),
+            id,
+            session.clone(),
+            alias.clone(),
+            config_path.clone(),
+            move |connect, cancel| {
+                transfer::download(
+                    connect,
+                    &remote_dir,
+                    &name,
+                    &local_dir,
+                    overwrite,
+                    &tag,
+                    cancel,
+                )
+            },
+        );
+        with_progress(work, total, measure, &progress).await
+    }
 }
 
 #[tauri::command]

@@ -28,7 +28,14 @@ tokio = { version = "1", features = ["io-util", "macros", "net", "process", "rt"
 # Same versions Tauri's WebView2 backend uses, to reach the browser settings it does not expose.
 [target.'cfg(windows)'.dependencies]
 webview2-com = "0.39"
-windows = { version = "0.62", features = ["Win32_Foundation", "Win32_Security_Credentials"] }
+windows = { version = "0.62", features = [
+    "Win32_Foundation",
+    "Win32_Security_Credentials",
+    # Opening downloaded copies with their app (ShellExecute, Open with).
+    "Win32_System_Com",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+] }
 
 [dev-dependencies]
 tempfile = "3"
