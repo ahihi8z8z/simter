@@ -1,10 +1,16 @@
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
-import { closeTerminal, openTerminal, resizeTerminal, writeTerminal, type Exit } from "./api";
+import { message } from "@tauri-apps/plugin-dialog";
+import { closeTerminal, openTerminal, resizeTerminal, writeClipboard, writeTerminal, type Exit } from "./api";
 import { describeExit, type State } from "./connection";
 import { clipboardAction } from "./keys";
 import { osc52Text } from "./osc52";
+
+/** Copies `text`; a failure is shown, as the user would otherwise paste something else unawares. */
+function copyText(text: string): void {
+  writeClipboard(text).catch((e) => void message(String(e), { title: "Could not copy", kind: "warning" }));
+}
 
 /**
  * One xterm.js terminal for a host. Each `connect()` runs a fresh
@@ -46,7 +52,7 @@ export class TerminalView {
     // A selection made in tmux/Byobu reaches the local clipboard as OSC 52, as in Windows Terminal.
     this.term.parser.registerOscHandler(52, (data) => {
       const text = osc52Text(data);
-      if (text !== null) navigator.clipboard.writeText(text).catch((err) => console.error("copy failed", err));
+      if (text !== null) copyText(text);
       return true;
     });
     this.term.onResize(({ cols, rows }) => {
@@ -138,7 +144,7 @@ export class TerminalView {
   }
 
   copy(): void {
-    navigator.clipboard.writeText(this.term.getSelection()).catch((err) => console.error("copy failed", err));
+    copyText(this.term.getSelection());
     this.term.clearSelection();
   }
 

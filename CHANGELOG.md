@@ -18,6 +18,13 @@ All notable changes to Simter are recorded here. The format follows
 - Hosts no longer move when you connect. Recently opened hosts are still listed first, but the
   order is updated only when Simter starts and on **Refresh**.
 
+### Fixed
+
+- Copying from the terminal sometimes left the clipboard unchanged: text selected in tmux/Byobu
+  was lost when you clicked into another app before it arrived from the host, and a copy gave up
+  when another app was briefly using the clipboard. Simter now copies whether or not its window
+  has focus, waits up to half a second for the clipboard, and says so when a copy fails.
+
 ## [0.2.0] - 2026-10-27
 
 Faster file browsing, file actions in right-click menus, real transfer progress, and a way to

@@ -1,4 +1,5 @@
 pub mod askpass;
+mod clipboard;
 mod commands;
 mod credentials;
 mod editor;
@@ -57,6 +58,7 @@ pub fn run() {
             commands::terminal_write,
             commands::terminal_resize,
             commands::terminal_close,
+            commands::clipboard_write,
         ])
         .run(tauri::generate_context!())
         .expect("error while running the application");

@@ -555,6 +555,31 @@ pub async fn terminal_open(
     .map_err(|e| format!("terminal task failed: {e}"))?
 }
 
+/// Copies terminal text to the clipboard, whether or not the window has focus.
+#[tauri::command]
+pub async fn clipboard_write(window: tauri::WebviewWindow, text: String) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        let owner = window
+            .hwnd()
+            .map_err(|e| format!("cannot find the app window: {e}"))?;
+        // HWND is a raw pointer; the handle goes to the other thread as a number.
+        let owner = owner.0 as isize;
+        // Off the async runtime: it may wait for another app to let go of the clipboard.
+        tauri::async_runtime::spawn_blocking(move || {
+            let owner = windows::Win32::Foundation::HWND(owner as *mut _);
+            crate::clipboard::write_text(owner, &text)
+        })
+        .await
+        .map_err(|e| format!("clipboard task failed: {e}"))?
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (window, text);
+        Err("copying to the clipboard is only supported on Windows".to_string())
+    }
+}
+
 #[tauri::command]
 pub fn terminal_write(
     terminals: State<'_, Terminals>,

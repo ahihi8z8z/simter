@@ -117,6 +117,14 @@ export function closeTerminal(id: number): Promise<void> {
   return invoke("terminal_close", { id });
 }
 
+/**
+ * Puts `text` on the Windows clipboard, also while the window does not have focus (an OSC 52 copy
+ * from tmux can arrive after the user clicked into another app). Rejects with the reason.
+ */
+export function writeClipboard(text: string): Promise<void> {
+  return invoke("clipboard_write", { text });
+}
+
 // Mirrors src-tauri/src/sftp.rs.
 
 export interface Entry {
