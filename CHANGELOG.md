@@ -13,6 +13,11 @@ All notable changes to Simter are recorded here. The format follows
   Changes to the copy are not uploaded. Programs and scripts are never run: they open with the
   app you pick in **Open with**.
 
+### Changed
+
+- Hosts no longer move when you connect. Recently opened hosts are still listed first, but the
+  order is updated only when Simter starts and on **Refresh**.
+
 ## [0.2.0] - 2026-10-27
 
 Faster file browsing, file actions in right-click menus, real transfer progress, and a way to

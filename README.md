@@ -25,7 +25,8 @@ Simter reads `%USERPROFILE%\.ssh\config` and never writes to it. Add hosts there
 ## Use
 
 - **Hosts** (right side bar): type to filter, Up/Down to select, Enter or double-click to
-  connect. Recently opened hosts are listed first. The selected host shows its effective
+  connect. Recently opened hosts are listed first; the order is updated when Simter starts and
+  on **Refresh**, so hosts do not move as you connect. The selected host shows its effective
   `user@hostname:port` from `ssh -G`.
 - **Open config** opens the SSH config at that host's line in VS Code (or Notepad); press
   **Refresh** after saving. Click the config path at the bottom to use another config file.

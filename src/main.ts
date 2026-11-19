@@ -72,8 +72,10 @@ let configPath = "";
 let customConfig: string | undefined;
 // %USERPROFILE%\.ssh\config as reported by the backend, once known.
 let defaultConfig = "";
-// Host aliases opened in the app, most recent first; listed first.
+// Host aliases opened in the app, most recent first.
 let recentHosts: string[] = [];
+// recentHosts as of the last refresh; the list is ordered by it so hosts do not move on connect.
+let listedRecent: string[] = [];
 // Side bar size and collapsed state, saved in prefs.
 let layout: Layout = {};
 let prefsErrorShown = false;
@@ -118,7 +120,7 @@ function requestDetails(): void {
 
 function render(): void {
   // Without a search, recent hosts are at the top; a line separates them from the rest.
-  const recentCount = search.value.trim() ? 0 : visible.filter((h) => recentHosts.includes(h.alias)).length;
+  const recentCount = search.value.trim() ? 0 : visible.filter((h) => listedRecent.includes(h.alias)).length;
   hostList.replaceChildren(
     ...visible.map((host, i) => {
       const item = document.createElement("li");
@@ -189,9 +191,9 @@ function renderIssues(issues: Issue[]): void {
   );
 }
 
-/** The hosts matching the search, recently opened ones first. */
+/** The hosts matching the search, those recently opened before the last refresh first. */
 function filtered(): Host[] {
-  return filterHosts(orderByRecent(all, recentHosts), search.value);
+  return filterHosts(orderByRecent(all, listedRecent), search.value);
 }
 
 function applyFilter(): void {
@@ -424,13 +426,10 @@ filesView.querySelector(".view-head")?.addEventListener("click", () => {
 function connect(): void {
   const host = visible[selected];
   if (!host) return;
+  // The list keeps its order until the next refresh.
   recordRecentHost(host.alias)
     .then((recent) => {
       recentHosts = recent;
-      const previous = visible[selected]?.alias;
-      visible = filtered();
-      selected = reselect(visible, previous);
-      render();
     })
     .catch(prefsError);
   const existing = tabs.find((t) => t.view.alias === host.alias && t.configPath === customConfig);
@@ -470,6 +469,7 @@ async function refresh(): Promise<void> {
   } finally {
     refreshButton.disabled = false;
   }
+  listedRecent = recentHosts;
   visible = filtered();
   selected = reselect(visible, previous);
   render();
