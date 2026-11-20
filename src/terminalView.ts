@@ -6,6 +6,7 @@ import { closeTerminal, openTerminal, resizeTerminal, writeClipboard, writeTermi
 import { describeExit, type State } from "./connection";
 import { clipboardAction } from "./keys";
 import { osc52Text } from "./osc52";
+import { RESET_REMOTE_MODES } from "./terminalModes";
 
 /** Copies `text`; a failure is shown, as the user would otherwise paste something else unawares. */
 function copyText(text: string): void {
@@ -74,6 +75,8 @@ export class TerminalView {
       this.resizeObserver.observe(this.element);
       this.opened = true;
     } else {
+      // The previous ssh may have ended without the remote undoing its modes (e.g. tmux mouse).
+      this.term.write(RESET_REMOTE_MODES);
       this.term.write("\r\n\x1b[2m[Reconnecting]\x1b[0m\r\n");
     }
     this.fitToElement();

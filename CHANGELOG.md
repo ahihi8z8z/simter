@@ -24,6 +24,9 @@ All notable changes to Simter are recorded here. The format follows
   was lost when you clicked into another app before it arrived from the host, and a copy gave up
   when another app was briefly using the clipboard. Simter now copies whether or not its window
   has focus, waits up to half a second for the clipboard, and says so when a copy fails.
+- After **Reconnect** from inside tmux/Byobu with mouse mode on, moving the mouse no longer types
+  text such as `35;18;5M` into the new shell. Simter now turns off the modes the old connection
+  left on (mouse reporting, the full-screen view, bracketed paste) before connecting again.
 
 ## [0.2.0] - 2026-10-27
 
